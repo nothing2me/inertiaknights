@@ -1,7 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Unity.Netcode;
 
-public class EnemySpawn : MonoBehaviour
+public class EnemySpawn : NetworkBehaviour
 {
     [Header("Spawning Settings")]
     public GameObject enemyPrefab;
@@ -17,12 +18,11 @@ public class EnemySpawn : MonoBehaviour
 
     void Update()
     {
+        // Only the server/host spawns enemies
+        if (!IsServer) return;
         if (enemyPrefab == null) return;
 
         // Clean up the list to remove any dead/destroyed enemies
-        // Unity overrides the == operator for objects, but inside RemoveAll's
-        // lambda it can sometimes fail to recognize destroyed objects as true null.
-        // We explicitly cast to UnityEngine.Object to ensure Unity's custom null check runs.
         activeEnemies.RemoveAll(enemy => (UnityEngine.Object)enemy == null || !enemy.activeInHierarchy);
 
         // Check against the local obelisk limit
@@ -54,8 +54,15 @@ public class EnemySpawn : MonoBehaviour
 
         Vector3 spawnPosition = transform.position + randomOffset;
 
-        // Ensure we spawn slightly above ground if needed, though relying on Physics is fine
+        // Instantiate and spawn across the network
         GameObject newEnemy = Instantiate(enemyPrefab, spawnPosition, Quaternion.identity);
+        
+        NetworkObject networkObject = newEnemy.GetComponent<NetworkObject>();
+        if (networkObject != null)
+        {
+            networkObject.Spawn();
+        }
+        
         activeEnemies.Add(newEnemy);
 
         // Assign this spawner as the home base for the new enemy
@@ -83,7 +90,6 @@ public class EnemySpawn : MonoBehaviour
             if (enemyScript != null)
             {
                 Gizmos.color = Color.yellow;
-                // Draw a simple flat wire disc if possible, but WireSphere is reliable
                 Gizmos.DrawWireSphere(transform.position, enemyScript.idleRoamRadius);
             }
         }

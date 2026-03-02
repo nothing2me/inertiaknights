@@ -1,17 +1,19 @@
 using UnityEngine;
-using UnityEngine.UI; // Required for standard UI elements like Slider and Text
-using TMPro; // Required for TextMeshPro elements
+using UnityEngine.UI;
+using TMPro;
+using Unity.Netcode;
 
-public class EnemyPlayer : MonoBehaviour
+public class EnemyPlayer : NetworkBehaviour
 {
     [Header("Health Settings")]
-    public float health = 100f;
     public float maxHealth = 100f;
+    // Server-authoritative health variable
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     
     [Header("UI Settings")]
     public string enemyName = "Target";
-    public GameObject uiContainer; // The canvas or panel holding the UI
-    public Vector3 uiOffset = new Vector3(0, 1.5f, 0); // Offset to keep it above the enemy
+    public GameObject uiContainer; 
+    public Vector3 uiOffset = new Vector3(0, 0.8f, 0); 
     public Slider healthSlider;
     public TextMeshProUGUI nameText;
     public Color normalTextColor = Color.white;
@@ -27,8 +29,8 @@ public class EnemyPlayer : MonoBehaviour
     public float attackDamage = 1f;
 
     [Header("Idle AI Settings")]
-    public float idleReturnDelay = 3f; // Seconds without target before returning
-    public float idleRoamRadius = 5f;  // Roam radius around the spawn pole
+    public float idleReturnDelay = 3f; 
+    public float idleRoamRadius = 5f;  
 
     private Transform cameraTransform;
     private Transform playerTransform;
@@ -45,33 +47,72 @@ public class EnemyPlayer : MonoBehaviour
 
     void Start()
     {
-        health = maxHealth;
-        
-        // Initialize UI
-        if (nameText != null) nameText.text = enemyName;
-        UpdateHealthUI();
-        SetUIVisibility(false); // Hide by default
-
-        // Cache the main camera for billboarding
-        if (Camera.main != null)
-        {
-            cameraTransform = Camera.main.transform;
-        }
-
-        // Cache Rigidbody
+        // Rigidbody and UI setup runs for everyone
         rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
             Debug.LogWarning($"EnemyPlayer {gameObject.name} is missing a Rigidbody! AI movement will not work.");
         }
 
-        // In multiplayer, we don't find the player once at start
-        // Instead, we'll find them dynamically in FixedUpdate
-        FindNearestPlayer();
+        if (nameText != null) nameText.text = enemyName;
+        UpdateHealthUI(currentHealth.Value);
+        
+        // Unparent the UI so it doesn't spin with the physics ball
+        if (uiContainer != null)
+        {
+            // Zero out any pre-existing local offsets in the prefab
+            // This ensures our 'uiOffset' variable is the ONLY thing that determines its height
+            if (uiContainer.TryGetComponent<RectTransform>(out var rect))
+            {
+                rect.anchoredPosition3D = Vector3.zero;
+            }
+            else
+            {
+                uiContainer.transform.localPosition = Vector3.zero;
+            }
+
+            // Sync with current world position before unparenting to avoid origin jumps
+            uiContainer.transform.position = transform.position;
+            
+            // Maintain world scale when unparenting
+            uiContainer.transform.SetParent(null, true);
+        }
+        
+        SetUIVisibility(false); 
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer)
+        {
+            currentHealth.Value = maxHealth;
+            FindNearestPlayer();
+        }
+
+        // Subscribe to health changes to update UI on all clients
+        currentHealth.OnValueChanged += OnHealthChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        currentHealth.OnValueChanged -= OnHealthChanged;
+        
+        // Clean up unparented UI
+        if (uiContainer != null)
+        {
+            Destroy(uiContainer);
+        }
+    }
+
+    private void OnHealthChanged(float previousValue, float newValue)
+    {
+        UpdateHealthUI(newValue);
     }
 
     private void FindNearestPlayer()
     {
+        if (!IsServer) return;
+
         BallController[] players = Object.FindObjectsByType<BallController>(FindObjectsSortMode.None);
         float closestDistance = Mathf.Infinity;
         BallController closestPlayer = null;
@@ -95,36 +136,41 @@ public class EnemyPlayer : MonoBehaviour
 
     void Update()
     {
-        // Billboard the UI and lock its position
-        if (uiContainer != null && uiContainer.activeSelf)
+        // Always keep the UI position synced with the enemy, even if hidden/camera-less
+        if (uiContainer != null)
         {
-            // Find the local player's camera dynamically
-            // This is the camera owned by the local client (IsOwner = true)
-            if (cameraTransform == null || !cameraTransform.gameObject.activeInHierarchy)
+            // Position follow logic
+            uiContainer.transform.position = transform.position + uiOffset;
+
+            // Only billboard and fade if visible
+            if (uiContainer.activeSelf)
             {
-                BallController localPlayer = GetLocalPlayer();
-                if (localPlayer != null)
+                if (cameraTransform == null || !cameraTransform.gameObject.activeInHierarchy)
                 {
-                    // Find the camera in the local player's hierarchy
-                    Camera cam = localPlayer.GetComponentInChildren<Camera>(false); // false = only active cameras
-                    if (cam != null) cameraTransform = cam.transform;
+                    BallController localPlayer = GetLocalPlayer();
+                    if (localPlayer != null)
+                    {
+                        Camera cam = localPlayer.GetComponentInChildren<Camera>(false);
+                        if (cam != null) cameraTransform = cam.transform;
+                    }
                 }
-            }
 
-            if (cameraTransform != null)
-            {
-                // Lock position so the Canvas doesn't roll or spin if the enemy's body rotates!
-                uiContainer.transform.position = transform.position + uiOffset;
+                if (cameraTransform != null)
+                {
+                    // Perfectly parallel to camera
+                    uiContainer.transform.rotation = cameraTransform.rotation;
+                }
+                else
+                {
+                    // Fallback to upright rotation if no camera found yet
+                    uiContainer.transform.rotation = Quaternion.identity;
+                }
 
-                // Make it perfectly parallel to the camera
-                uiContainer.transform.rotation = cameraTransform.rotation;
-            }
-
-            // Smoothly fade text color based on targeted status
-            if (nameText != null)
-            {
-                Color targetColor = isTargeted ? targetTextColor : normalTextColor;
-                nameText.color = Color.Lerp(nameText.color, targetColor, Time.deltaTime * colorFadeSpeed);
+                if (nameText != null)
+                {
+                    Color targetColor = isTargeted ? targetTextColor : normalTextColor;
+                    nameText.color = Color.Lerp(nameText.color, targetColor, Time.deltaTime * colorFadeSpeed);
+                }
             }
         }
     }
@@ -146,7 +192,9 @@ public class EnemyPlayer : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Re-scan for players occasionally or if current one is lost
+        // Only the server runs AI logic
+        if (!IsServer) return;
+
         if (playerTransform == null || Time.frameCount % 60 == 0)
         {
             FindNearestPlayer();
@@ -156,29 +204,25 @@ public class EnemyPlayer : MonoBehaviour
 
         float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
 
-        // Check if player is within chase range
         if (distanceToPlayer <= chaseRange)
         {
-            timeSinceLastTarget = 0f; // Reset idle timer
+            timeSinceLastTarget = 0f;
             isWandering = false;
 
-            // Calculate direction to player on the XZ plane
             Vector3 directionToPlayer = playerTransform.position - transform.position;
-            directionToPlayer.y = 0; // Don't fly into the air
+            directionToPlayer.y = 0;
             directionToPlayer.Normalize();
 
-            // Check if within attack range and cooldown is ready
             if (distanceToPlayer <= attackRange && Time.time >= lastAttackTime + attackCooldown)
             {
                 PerformDashAttack(directionToPlayer);
             }
-            // Otherwise, chase the player if not currently dashing
-            else if (!isDashing && distanceToPlayer > attackRange - 1f) // slight buffer so they don't stutter at exact attack range
+            else if (!isDashing && distanceToPlayer > attackRange - 1f)
             {
                 rb.AddForce(directionToPlayer * moveSpeed);
             }
         }
-        else if (!isDashing) // Player is out of range
+        else if (!isDashing)
         {
             timeSinceLastTarget += Time.fixedDeltaTime;
 
@@ -188,7 +232,6 @@ public class EnemyPlayer : MonoBehaviour
             }
             else
             {
-                // Slow down existing momentum if just idling
                 rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, new Vector3(0, rb.linearVelocity.y, 0), Time.fixedDeltaTime * 2f);
             }
         }
@@ -196,23 +239,19 @@ public class EnemyPlayer : MonoBehaviour
 
     private void HandleIdleWander()
     {
-        // If we need a new wander target around the base
         if (!isWandering || Vector3.Distance(transform.position, currentWanderTarget) < 1f)
         {
-            // Pick a random point within roam radius of the home base
             Vector2 randomCircle = Random.insideUnitCircle * idleRoamRadius;
             currentWanderTarget = homeBase.position + new Vector3(randomCircle.x, 0, randomCircle.y);
             isWandering = true;
         }
 
-        // Move towards wander target
         Vector3 directionToWander = currentWanderTarget - transform.position;
         directionToWander.y = 0;
         
         if (directionToWander.magnitude > 0.5f)
         {
             directionToWander.Normalize();
-            // Move slower when wandering (half speed)
             rb.AddForce(directionToWander * (moveSpeed * 0.4f)); 
         }
     }
@@ -229,7 +268,6 @@ public class EnemyPlayer : MonoBehaviour
         rb.AddForce(direction * lungeForce, ForceMode.Impulse);
         Debug.Log($"{gameObject.name} dashed at the player!");
         
-        // Reset dash flag after a short delay so they can resume normal chasing
         Invoke(nameof(ResetDash), 0.5f);
     }
 
@@ -240,16 +278,13 @@ public class EnemyPlayer : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        // If we hit the player while moving fast enough (like during a dash)
-        if (isDashing && collision.gameObject.CompareTag("Player") && playerController != null)
+        if (!IsServer) return;
+
+        // On collision with player, server deals damage
+        BallController player = collision.gameObject.GetComponent<BallController>();
+        if (isDashing && player != null)
         {
-            // Only deal damage if we actually hit them during the dash
-            playerController.TakeDamage(Mathf.RoundToInt(attackDamage));
-        }
-        // Fallback in case tags aren't set but we hit the BallController
-        else if (isDashing && collision.gameObject.GetComponent<BallController>() != null)
-        {
-             collision.gameObject.GetComponent<BallController>().TakeDamage(Mathf.RoundToInt(attackDamage));
+            player.TakeDamage(Mathf.RoundToInt(attackDamage));
         }
     }
 
@@ -261,39 +296,60 @@ public class EnemyPlayer : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Clients call this to request the server to damage this enemy.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void TakeDamageServerRpc(float amount)
+    {
+        TakeDamage(amount);
+    }
+
     public void TakeDamage(float amount)
     {
-        health -= amount;
-        Debug.Log($"{gameObject.name} took {amount:F1} damage! Remaining Health: {health:F1}");
-        
-        UpdateHealthUI();
+        if (!IsServer)
+        {
+            TakeDamageServerRpc(amount);
+            return;
+        }
 
-        if (health <= 0)
+        currentHealth.Value -= amount;
+        Debug.Log($"{gameObject.name} took {amount:F1} damage! Remaining Health: {currentHealth.Value:F1}");
+        
+        if (currentHealth.Value <= 0)
         {
             Die();
         }
     }
 
-    private void UpdateHealthUI()
+    private void UpdateHealthUI(float currentVal)
     {
         if (healthSlider != null)
         {
             healthSlider.maxValue = maxHealth;
-            healthSlider.value = health;
+            healthSlider.value = currentVal;
         }
     }
 
     private void Die()
     {
+        if (!IsServer) return;
+
         Debug.Log($"{gameObject.name} has been defeated!");
-        // We destroy the object so the EnemySpawn script knows it's truly dead
-        // and can properly remove it from its activeEnemies list.
-        Destroy(gameObject);
+        
+        // Despawn networked object
+        if (IsSpawned)
+        {
+            GetComponent<NetworkObject>().Despawn();
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     private void OnDrawGizmosSelected()
     {
-        // Visualize the ranges in the editor
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, chaseRange);
 
@@ -307,3 +363,4 @@ public class EnemyPlayer : MonoBehaviour
         }
     }
 }
+

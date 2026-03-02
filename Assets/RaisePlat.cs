@@ -1,6 +1,7 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class RaisePlat : MonoBehaviour
+public class RaisePlat : NetworkBehaviour
 {
     public float raiseHeight = 3f;
     public float moveSpeed = 2f;
@@ -23,6 +24,9 @@ public class RaisePlat : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        // Only the server manages the platform movement
+        if (!IsServer) return;
+
         // Only trigger if a ball (Rigidbody) hits us and we aren't already moving
         if (!isMoving && collision.collider.GetComponent<Rigidbody>() != null)
         {
@@ -60,3 +64,4 @@ public class RaisePlat : MonoBehaviour
         isMoving = false;
     }
 }
+

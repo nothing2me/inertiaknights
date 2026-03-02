@@ -1,10 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
-using UnityEngine.Networking;
 using System.Collections;
-using System.Net;
-using System.Net.Sockets;
 
 public class BallController : NetworkBehaviour
 {
@@ -97,7 +94,16 @@ public class BallController : NetworkBehaviour
         // Prevent ball from falling through floor at high speeds
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
-        // Save spawn state
+        // Initial spawn at a random platform position
+        if (PlayerSpawnManager.Instance != null)
+        {
+            transform.position = PlayerSpawnManager.Instance.GetRandomSpawnPosition();
+            
+            // Snap camera instantly to avoid jerk
+            if (playerCameraController != null) playerCameraController.SnapToTarget();
+        }
+
+        // Save current state for respawns (this will be updated if we want to change spawn points)
         spawnPosition = transform.position;
         spawnRotation = transform.rotation;
 
@@ -151,22 +157,8 @@ public class BallController : NetworkBehaviour
             // Set my name if I have one saved (e.g. from UI)
             SetPlayerNameServerRpc(NetworkManagerUI.LocalPlayerName);
 
-            // Display IP:Port if we are the host
-            if (IsServer && scoreCounter != null)
-            {
-                var transport = NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
-                if (transport != null)
-                {
-                    string port = transport.ConnectionData.Port.ToString();
-                    
-                    // Display Local IP immediately
-                    string localIp = GetLocalIpAddress();
-                    scoreCounter.SetLocalIp($"{localIp}:{port}");
-
-                    // Fetch Public IP asynchronously
-                    StartCoroutine(FetchPublicIp(port));
-                }
-            }
+            // Set my name if I have one saved (e.g. from UI)
+            SetPlayerNameServerRpc(NetworkManagerUI.LocalPlayerName);
         }
         else
         {
@@ -606,9 +598,18 @@ public class BallController : NetworkBehaviour
     [ContextMenu("Manual Respawn")]
     public void Respawn()
     {
+        // Get a fresh position from the spawn manager if available
+        if (PlayerSpawnManager.Instance != null)
+        {
+            spawnPosition = PlayerSpawnManager.Instance.GetRandomSpawnPosition();
+        }
+
         // Reset position and rotation
         transform.position = spawnPosition;
         transform.rotation = spawnRotation;
+
+        // Snap camera instantly to avoid jerk
+        if (playerCameraController != null) playerCameraController.SnapToTarget();
 
         // Reset speed and physics
         if (rb != null)
@@ -640,38 +641,4 @@ public class BallController : NetworkBehaviour
         Gizmos.DrawWireSphere(transform.position, attackRange);
     }
 
-    private string GetLocalIpAddress()
-    {
-        string localIp = "127.0.0.1";
-        try {
-            var host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (var ip in host.AddressList) {
-                if (ip.AddressFamily == AddressFamily.InterNetwork) {
-                    localIp = ip.ToString();
-                    break;
-                }
-            }
-        } catch { }
-        return localIp;
-    }
-
-    private IEnumerator FetchPublicIp(string port)
-    {
-        scoreCounter.SetPublicIp("Fetching...");
-        
-        using (UnityWebRequest webRequest = UnityWebRequest.Get("https://api.ipify.org"))
-        {
-            yield return webRequest.SendWebRequest();
-
-            if (webRequest.result == UnityWebRequest.Result.Success)
-            {
-                scoreCounter.SetPublicIp($"{webRequest.downloadHandler.text.Trim()}:{port}");
-            }
-            else
-            {
-                scoreCounter.SetPublicIp("Failed to fetch");
-                Debug.LogWarning($"Public IP fetch failed: {webRequest.error}");
-            }
-        }
-    }
 }

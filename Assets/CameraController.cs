@@ -114,6 +114,46 @@ public class CameraController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Instantly snaps the camera to its current target position/rotation, 
+    /// bypassing all smoothing. Call this after teleporting the target ball.
+    /// </summary>
+    public void SnapToTarget()
+    {
+        if (target == null) return;
+
+        Vector3 desiredPosition;
+        Quaternion desiredRotation;
+
+        if (useIsometricView)
+        {
+            desiredPosition = target.position + isometricOffset;
+            desiredRotation = Quaternion.Euler(isometricRotation);
+        }
+        else if (followMovementDirection && targetRb != null)
+        {
+            // Calculate movement rotation (use forward if velocity is zero)
+            Vector3 velocity = targetRb.linearVelocity;
+            velocity.y = 0;
+            if (velocity.magnitude > 0.2f) lastMovementDir = velocity.normalized;
+
+            Quaternion movementRotation = Quaternion.LookRotation(lastMovementDir);
+            desiredPosition = target.position + (movementRotation * offset);
+            
+            Vector3 lookDirection = target.position - desiredPosition;
+            desiredRotation = lookDirection != Vector3.zero ? Quaternion.LookRotation(lookDirection) : transform.rotation;
+        }
+        else
+        {
+            desiredPosition = target.position + offset;
+            desiredRotation = lockRotation ? Quaternion.Euler(fixedAngle) : transform.rotation;
+        }
+
+        transform.position = desiredPosition;
+        transform.rotation = desiredRotation;
+        currentVelocity = Vector3.zero; // Reset smooth damp velocity
+    }
+
     // Remove LateUpdate brutally locking rotation since we might want dynamic rotation
     // void LateUpdate() { ... }
 }
