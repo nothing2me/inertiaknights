@@ -9,6 +9,7 @@ public class NetworkManagerUI : MonoBehaviour
     [SerializeField] private Button hostButton;
     [SerializeField] private Button clientButton;
     [SerializeField] private TMPro.TMP_InputField nameInputField;
+    [SerializeField] private TMPro.TMP_InputField ipInputField; // Allow direct connection (e.g., playit.gg)
     [SerializeField] private NetworkDiscovery networkDiscovery;
     [SerializeField] private TextMeshProUGUI statusText; // Optional: shows "Searching..." feedback
 
@@ -49,7 +50,14 @@ public class NetworkManagerUI : MonoBehaviour
         
         clientButton.onClick.AddListener(() => {
             UpdateLocalName();
-            StartLANSearch();
+            if (ipInputField != null && !string.IsNullOrWhiteSpace(ipInputField.text))
+            {
+                ConnectToDirectIP(ipInputField.text);
+            }
+            else
+            {
+                StartLANSearch();
+            }
         });
 
         if (NetworkManager.Singleton != null)
@@ -77,6 +85,55 @@ public class NetworkManagerUI : MonoBehaviour
 
         networkDiscovery.OnServerFound += OnLANServerFound;
         networkDiscovery.StartSearch();
+    }
+
+    private void ConnectToDirectIP(string ipAndPort)
+    {
+        hostButton.interactable = false;
+        clientButton.interactable = false;
+
+        string ip = ipAndPort.Trim();
+        ushort port = 7777;
+
+        if (ip.Contains(":"))
+        {
+            string[] parts = ip.Split(':');
+            ip = parts[0];
+            if (ushort.TryParse(parts[1], out ushort parsedPort))
+            {
+                port = parsedPort;
+            }
+        }
+
+        if (statusText != null)
+        {
+            statusText.text = $"Connecting to {ip}:{port}...";
+            statusText.gameObject.SetActive(true);
+        }
+
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport != null)
+        {
+            // Set the address we want to connect to
+            transport.SetConnectionData(ip, port);
+        }
+
+        if (NetworkManager.Singleton.StartClient())
+        {
+            // Hide menu immediately while handshaking
+            hostButton.gameObject.SetActive(false);
+            clientButton.gameObject.SetActive(false);
+            if (nameInputField != null) nameInputField.gameObject.SetActive(false);
+            if (ipInputField != null) ipInputField.gameObject.SetActive(false);
+            
+            // Handshake timeout
+            CancelInvoke(nameof(ConnectionTimeout));
+            Invoke(nameof(ConnectionTimeout), 10f);
+        }
+        else
+        {
+            ResetUI("Failed to start Client component.");
+        }
     }
 
     private void DiscoveryTimeout()
@@ -108,6 +165,7 @@ public class NetworkManagerUI : MonoBehaviour
             hostButton.gameObject.SetActive(false);
             clientButton.gameObject.SetActive(false);
             if (nameInputField != null) nameInputField.gameObject.SetActive(false);
+            if (ipInputField != null) ipInputField.gameObject.SetActive(false);
             
             // Handshake timeout
             CancelInvoke(nameof(ConnectionTimeout));
@@ -155,6 +213,7 @@ public class NetworkManagerUI : MonoBehaviour
         hostButton.gameObject.SetActive(true);
         clientButton.gameObject.SetActive(true);
         if (nameInputField != null) nameInputField.gameObject.SetActive(true);
+        if (ipInputField != null) ipInputField.gameObject.SetActive(true);
         
         gameObject.SetActive(true);
 
