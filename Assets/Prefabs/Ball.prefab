@@ -150,7 +150,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5ea0802181cfb4b40b04c7ff0ffe915a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
-  target: {fileID: 0}
+  target: {fileID: 6045722803132609954}
   offset: {x: -5, y: 3, z: -7}
   smoothTime: 0.5
   lockRotation: 1
@@ -160,6 +160,16 @@ MonoBehaviour:
   useIsometricView: 0
   isometricOffset: {x: 10, y: 10, z: -10}
   isometricRotation: {x: 35, y: -45, z: 0}
+  enableCollision: 1
+  collisionLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  cameraRadius: 5
+  minDistance: 10
+  collisionBuffer: 0.1
+  manualRotationSpeed: 2
+  minPitch: -20
+  maxPitch: 80
 --- !u!1 &4172051811853493982
 GameObject:
   m_ObjectHideFlags: 0
@@ -318,7 +328,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3671802159
+  GlobalObjectIdHash: 299332544
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -357,6 +367,8 @@ MonoBehaviour:
   scoreCounter: {fileID: 0}
   maxHealth: 10
   damageCooldown: 1.5
+  currentHealth:
+    m_InternalValue: 3
   moveAction:
     m_Name: Move
     m_Type: 0
@@ -498,11 +510,46 @@ MonoBehaviour:
   attackRange: 15
   lungeForce: 20
   damageMultiplier: 2
-  attackCooldown: 0.5
+  attackCooldown: 0.2
   homingStrength: 0.5
   homingDuration: 0.3
   playerImpactDampen: 0.5
   enemyKnockbackForce: 0.5
+  playerName:
+    m_InternalValue:
+      utf8LengthInBytes: 6
+      bytes:
+        offset0000:
+          byte0000: 80
+          byte0001: 108
+          byte0002: 97
+          byte0003: 121
+          byte0004: 101
+          byte0005: 114
+          byte0006: 0
+          byte0007: 0
+          byte0008: 0
+          byte0009: 0
+          byte0010: 0
+          byte0011: 0
+          byte0012: 0
+          byte0013: 0
+          byte0014: 0
+          byte0015: 0
+        byte0016: 0
+        byte0017: 0
+        byte0018: 0
+        byte0019: 0
+        byte0020: 0
+        byte0021: 0
+        byte0022: 0
+        byte0023: 0
+        byte0024: 0
+        byte0025: 0
+        byte0026: 0
+        byte0027: 0
+        byte0028: 0
+        byte0029: 0
 --- !u!114 &-4398922829369228870
 MonoBehaviour:
   m_ObjectHideFlags: 0

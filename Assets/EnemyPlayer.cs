@@ -299,7 +299,7 @@ public class EnemyPlayer : NetworkBehaviour
     /// <summary>
     /// Clients call this to request the server to damage this enemy.
     /// </summary>
-    [ServerRpc(RequireOwnership = false)]
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     public void TakeDamageServerRpc(float amount)
     {
         TakeDamage(amount);

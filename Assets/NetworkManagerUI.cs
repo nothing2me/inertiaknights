@@ -25,6 +25,7 @@ public class NetworkManagerUI : MonoBehaviour
         }
 
         hostButton.onClick.AddListener(() => {
+            Debug.Log("[NetworkManagerUI] Host button clicked.");
             UpdateLocalName();
             
             var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
@@ -49,13 +50,16 @@ public class NetworkManagerUI : MonoBehaviour
         });
         
         clientButton.onClick.AddListener(() => {
+            Debug.Log("[NetworkManagerUI] Client button clicked.");
             UpdateLocalName();
             if (ipInputField != null && !string.IsNullOrWhiteSpace(ipInputField.text))
             {
+                Debug.Log($"[NetworkManagerUI] Attempting direct connection to: {ipInputField.text}");
                 ConnectToDirectIP(ipInputField.text);
             }
             else
             {
+                Debug.Log("[NetworkManagerUI] Starting LAN search.");
                 StartLANSearch();
             }
         });
@@ -238,7 +242,20 @@ public class NetworkManagerUI : MonoBehaviour
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnConnectSuccess;
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnConnectFailed;
+            
+            // Critical: Shut down the network manager if it's being destroyed
+            if (NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.Shutdown();
+            }
         }
+    }
+
+    private void OnApplicationQuit()
+    {
+        // Hard shutdown to ensure no zombie processes remain
+        if (networkDiscovery != null) networkDiscovery.StopDiscovery();
+        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
     }
 
     private void OnDisable()

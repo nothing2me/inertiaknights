@@ -1,25 +1,45 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class CameraController : MonoBehaviour
 {
     [Header("Follow Settings")]
-    public Transform target;        // The ball to follow
-    public Vector3 offset = new Vector3(0, 5, -7); // Distance from the ball
-    public float smoothTime = 0.15f; // Time it takes to reach the target
+    public Transform target;
+    public Vector3 pivotOffset = new Vector3(0, 1.5f, 0); // Offset from ball center
+    public float targetDistance = 7f;
+    public float minFollowDistance = 2f;
+    public float maxFollowDistance = 15f;
+    
+    [Header("Smoothing Settings")]
+    public float positionSmoothTime = 0.1f;
+    public float rotationSmoothTime = 0.05f;
+    public float zoomSmoothTime = 0.2f;
 
     [Header("Rotation Settings")]
-    [Header("Rotation Settings")]
-    public bool lockRotation = false;
+    public float manualRotationSpeed = 2f;
+    public float autoRotationSpeed = 5f;
+    public float minPitch = -20f;
+    public float maxPitch = 80f;
     public bool followMovementDirection = true;
-    public float rotationSpeed = 5f;
-    public Vector3 fixedAngle = new Vector3(30, 0, 0); // Desired camera angle if locked
 
-    [Header("Isometric Settings")]
-    public bool useIsometricView = false;
-    public Vector3 isometricOffset = new Vector3(10, 10, -10);
-    public Vector3 isometricRotation = new Vector3(35, -45, 0);
+    [Header("Collision Settings")]
+    public bool enableCollision = true;
+    public LayerMask collisionLayer;
+    public float cameraRadius = 0.2f;
+    public float collisionBuffer = 0.1f;
 
-    private Vector3 currentVelocity = Vector3.zero;
+    // State variables
+    private Vector3 currentPivotPosition;
+    private Vector3 pivotVelocity;
+    private float currentYaw;
+    private float currentPitch;
+    private float targetYaw;
+    private float targetPitch;
+    private float yawVelocity;
+    private float pitchVelocity;
+    private float currentDistance;
+    private float distanceVelocity;
+    private bool isManualControl = false;
     private Rigidbody targetRb;
     private Vector3 lastMovementDir = Vector3.forward;
 
@@ -28,7 +48,16 @@ public class CameraController : MonoBehaviour
         if (target != null)
         {
             targetRb = target.GetComponent<Rigidbody>();
+            currentPivotPosition = target.position + pivotOffset;
+            
+            // Initialize yaw/pitch based on starting transform
+            currentYaw = targetYaw = transform.eulerAngles.y;
+            currentPitch = targetPitch = transform.eulerAngles.x;
+            if (currentPitch > 180) currentPitch = targetPitch -= 360;
+            
+            currentDistance = targetDistance;
         }
+        Debug.Log($"[CameraController] Started on {gameObject.name}. Target: {(target != null ? target.name : "None")}. Collision Layer: {collisionLayer.value}");
     }
 
     public void SetTarget(Transform newTarget)
@@ -51,67 +80,47 @@ public class CameraController : MonoBehaviour
 
     // Awake unparenting removed - now handled by BallController.OnNetworkSpawn for the owner only.
 
-    void FixedUpdate() 
+    void Update()
+    {
+        if (target == null) return;
+        HandleManualInput();
+    }
+
+    void LateUpdate() 
     {
         if (target == null) return;
 
-        Vector3 desiredPosition;
-        Quaternion desiredRotation;
-
-        if (useIsometricView)
+        // 1. Pivot Tracking
+        currentPivotPosition = Vector3.SmoothDamp(currentPivotPosition, target.position + pivotOffset, ref pivotVelocity, positionSmoothTime);
+        // 2. Rotation Blending (Auto-Follow or Manual)
+        if (!isManualControl && followMovementDirection && targetRb != null)
         {
-            // Isometric View logic
-            desiredPosition = target.position + isometricOffset;
-            desiredRotation = Quaternion.Euler(isometricRotation);
-
-            // Smooth position, snappy rotation (or also smooth if preferred)
-            transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref currentVelocity, smoothTime);
-            transform.rotation = Quaternion.Slerp(transform.rotation, desiredRotation, rotationSpeed * Time.fixedDeltaTime);
-        }
-        else if (followMovementDirection && targetRb != null)
-        {
-            // Calculate movement direction (ignoring Y for horizontal orientation)
             Vector3 velocity = targetRb.linearVelocity;
             velocity.y = 0;
-
-            if (velocity.magnitude > 0.2f)
+            if (velocity.magnitude > 0.1f)
             {
                 lastMovementDir = velocity.normalized;
+                targetYaw = Quaternion.LookRotation(lastMovementDir).eulerAngles.y;
             }
-
-            // Calculate rotation that looks in the movement direction
-            Quaternion movementRotation = Quaternion.LookRotation(lastMovementDir);
-            
-            // Calculate desired position by rotating the offset
-            Vector3 rotatedOffset = movementRotation * offset;
-            desiredPosition = target.position + rotatedOffset;
-
-            // Camera should look at the ball (target)
-            Vector3 lookDirection = target.position - transform.position;
-            if (lookDirection != Vector3.zero)
-            {
-                desiredRotation = Quaternion.LookRotation(lookDirection);
-            }
-            else
-            {
-                desiredRotation = transform.rotation;
-            }
-
-            // Apply smooth position and rotation
-            transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref currentVelocity, smoothTime);
-            transform.rotation = Quaternion.Slerp(transform.rotation, desiredRotation, rotationSpeed * Time.fixedDeltaTime);
         }
-        else
+
+        // 3. Apply Rotation Smoothing
+        currentYaw = Mathf.SmoothDampAngle(currentYaw, targetYaw, ref yawVelocity, rotationSmoothTime);
+        currentPitch = Mathf.SmoothDampAngle(currentPitch, targetPitch, ref pitchVelocity, rotationSmoothTime);
+        Quaternion rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
+
+        // 4. Distance and Collision
+        float desiredDistance = targetDistance;
+        if (enableCollision)
         {
-            // Fallback to original follow behavior
-            desiredPosition = target.position + offset;
-            transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref currentVelocity, smoothTime);
-            
-            if (lockRotation)
-            {
-                transform.rotation = Quaternion.Euler(fixedAngle);
-            }
+            desiredDistance = GetCollisionDistance(currentPivotPosition, rotation, targetDistance);
         }
+        
+        currentDistance = Mathf.SmoothDamp(currentDistance, desiredDistance, ref distanceVelocity, zoomSmoothTime);
+
+        // 5. Final Transforms
+        transform.position = currentPivotPosition - (rotation * Vector3.forward * currentDistance);
+        transform.rotation = rotation;
     }
 
     /// <summary>
@@ -122,38 +131,83 @@ public class CameraController : MonoBehaviour
     {
         if (target == null) return;
 
-        Vector3 desiredPosition;
-        Quaternion desiredRotation;
+        currentPivotPosition = target.position + pivotOffset;
+        currentYaw = targetYaw;
+        currentPitch = targetPitch;
+        currentDistance = targetDistance;
+        
+        yawVelocity = pitchVelocity = distanceVelocity = 0;
+        pivotVelocity = Vector3.zero;
 
-        if (useIsometricView)
+        Quaternion rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
+        if (enableCollision)
         {
-            desiredPosition = target.position + isometricOffset;
-            desiredRotation = Quaternion.Euler(isometricRotation);
+            currentDistance = GetCollisionDistance(currentPivotPosition, rotation, targetDistance);
         }
-        else if (followMovementDirection && targetRb != null)
-        {
-            // Calculate movement rotation (use forward if velocity is zero)
-            Vector3 velocity = targetRb.linearVelocity;
-            velocity.y = 0;
-            if (velocity.magnitude > 0.2f) lastMovementDir = velocity.normalized;
 
-            Quaternion movementRotation = Quaternion.LookRotation(lastMovementDir);
-            desiredPosition = target.position + (movementRotation * offset);
+        transform.position = currentPivotPosition - (rotation * Vector3.forward * currentDistance);
+        transform.rotation = rotation;
+    }
+
+    private void HandleManualInput()
+    {
+        bool rightClickState = false;
+        if (Mouse.current != null) 
+            rightClickState = Mouse.current.rightButton.isPressed;
+        else 
+            rightClickState = Input.GetMouseButton(1);
             
-            Vector3 lookDirection = target.position - desiredPosition;
-            desiredRotation = lookDirection != Vector3.zero ? Quaternion.LookRotation(lookDirection) : transform.rotation;
+        if (rightClickState)
+        {
+            if (!isManualControl)
+            {
+                isManualControl = true;
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+                
+                // Sync targets to current values to prevent snap on start
+                targetYaw = currentYaw;
+                targetPitch = currentPitch;
+            }
+
+            Vector2 delta = Vector2.zero;
+            if (Mouse.current != null)
+                delta = Mouse.current.delta.ReadValue() * 0.1f;
+            else
+                delta = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * 10f;
+            
+            if (delta.sqrMagnitude > 0)
+            {
+                targetYaw += delta.x * manualRotationSpeed;
+                targetPitch -= delta.y * manualRotationSpeed;
+                targetPitch = Mathf.Clamp(targetPitch, minPitch, maxPitch);
+            }
         }
         else
         {
-            desiredPosition = target.position + offset;
-            desiredRotation = lockRotation ? Quaternion.Euler(fixedAngle) : transform.rotation;
+            if (isManualControl)
+            {
+                isManualControl = false;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
         }
-
-        transform.position = desiredPosition;
-        transform.rotation = desiredRotation;
-        currentVelocity = Vector3.zero; // Reset smooth damp velocity
     }
 
-    // Remove LateUpdate brutally locking rotation since we might want dynamic rotation
-    // void LateUpdate() { ... }
+    private float GetCollisionDistance(Vector3 pivot, Quaternion rotation, float maxDistance)
+    {
+        Vector3 direction = rotation * -Vector3.forward;
+        RaycastHit hit;
+        
+        // Start ray slightly in front of pivot to avoid hitting target itself
+        Vector3 rayStart = pivot + direction * 0.5f;
+        float castDist = maxDistance - 0.5f;
+
+        if (Physics.SphereCast(rayStart, cameraRadius, direction, out hit, castDist, collisionLayer))
+        {
+            return Mathf.Max(0.1f, hit.distance + 0.5f - collisionBuffer);
+        }
+
+        return maxDistance;
+    }
 }

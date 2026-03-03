@@ -93,15 +93,11 @@ public class BallController : NetworkBehaviour
 
         // Prevent ball from falling through floor at high speeds
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        
+        // Fix Jitter: Enforce interpolation for smooth LateUpdate camera tracking
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-        // Initial spawn at a random platform position
-        if (PlayerSpawnManager.Instance != null)
-        {
-            transform.position = PlayerSpawnManager.Instance.GetRandomSpawnPosition();
-            
-            // Snap camera instantly to avoid jerk
-            if (playerCameraController != null) playerCameraController.SnapToTarget();
-        }
+        // Initial spawn is now handled in OnNetworkSpawn for better network reliability
 
         // Save current state for respawns (this will be updated if we want to change spawn points)
         spawnPosition = transform.position;
@@ -154,8 +150,22 @@ public class BallController : NetworkBehaviour
                 }
             }
 
-            // Set my name if I have one saved (e.g. from UI)
-            SetPlayerNameServerRpc(NetworkManagerUI.LocalPlayerName);
+            // --- Spawn Logic (Owner Only) ---
+            if (PlayerSpawnManager.Instance != null)
+            {
+                transform.position = PlayerSpawnManager.Instance.GetRandomSpawnPosition();
+                // Critical: Sync physics immediately so Netcode doesn't try to interpolate from (0,0,0)
+                Physics.SyncTransforms();
+                
+                // Snap camera to the new spawned position
+                if (playerCameraController != null) playerCameraController.SnapToTarget();
+            }
+
+            // Diagnostic: Log current network configuration
+            if (NetworkManager.Singleton != null)
+            {
+                Debug.Log($"[Netcode Diagnostic] Tick Rate: {NetworkManager.Singleton.NetworkConfig.TickRate}hz. Owner Client Id: {OwnerClientId}");
+            }
 
             // Set my name if I have one saved (e.g. from UI)
             SetPlayerNameServerRpc(NetworkManagerUI.LocalPlayerName);
@@ -565,7 +575,7 @@ public class BallController : NetworkBehaviour
         TakeDamageServerRpc(damage);
     }
 
-    [ServerRpc(RequireOwnership = false)]
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     public void TakeDamageServerRpc(int damage)
     {
         // Only server can modify NetworkVariable
