@@ -68,7 +68,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 50
+  field of view: 60
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -151,25 +151,26 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
   target: {fileID: 6045722803132609954}
-  offset: {x: -5, y: 3, z: -7}
-  smoothTime: 0.5
-  lockRotation: 1
-  followMovementDirection: 1
-  rotationSpeed: 15
-  fixedAngle: {x: 20, y: 0, z: 0}
-  useIsometricView: 0
-  isometricOffset: {x: 10, y: 10, z: -10}
-  isometricRotation: {x: 35, y: -45, z: 0}
+  pivotOffset: {x: 0, y: 1.2, z: 0}
+  mouseSensitivity: 1.5
+  invertY: 0
+  minPitch: 0
+  maxPitch: 80
+  targetDistance: 10.52
+  minFollowDistance: 2
+  maxFollowDistance: 20
+  maxRollTilt: 10
+  maxPitchLean: 5
+  tiltSmoothTime: 0.5
+  mouseSmoothTime: 0.09
+  positionSmoothTime: 0.1
+  zoomSmoothTime: 0.2
   enableCollision: 1
   collisionLayer:
     serializedVersion: 2
     m_Bits: 4294967295
-  cameraRadius: 5
-  minDistance: 10
+  cameraRadius: 1
   collisionBuffer: 0.1
-  manualRotationSpeed: 2
-  minPitch: -20
-  maxPitch: 80
 --- !u!1 &4172051811853493982
 GameObject:
   m_ObjectHideFlags: 0
@@ -328,8 +329,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 299332544
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 3671802159
+  InScenePlacedSourceGlobalObjectIdHash: 3671802159
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
@@ -503,6 +504,24 @@ MonoBehaviour:
       m_Action: Attack
       m_Flags: 0
     m_Flags: 0
+  brakeAction:
+    m_Name: Brake
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: e7f9f9d0-2b82-4003-86bd-77e66f5bf983
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings:
+    - m_Name: 
+      m_Id: d5fbd928-6e6f-4a90-92ee-bb5f74eb924c
+      m_Path: <Keyboard>/ctrl
+      m_Interactions: 
+      m_Processors: 
+      m_Groups: 
+      m_Action: Brake
+      m_Flags: 0
+    m_Flags: 0
+  brakeFriction: 0.15
   dashForce: 15
   dashCooldown: 0.5
   groundSlamForce: 10

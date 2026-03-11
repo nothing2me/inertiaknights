@@ -27,13 +27,20 @@ public class NetworkManagerUI : MonoBehaviour
         hostButton.onClick.AddListener(() => {
             Debug.Log("[NetworkManagerUI] Host button clicked.");
             UpdateLocalName();
-            
+
+            // Defensive: fully shut down any stale session that may be holding the port
+            if (NetworkManager.Singleton.IsListening)
+            {
+                Debug.Log("[NetworkManagerUI] Shutting down stale session before hosting.");
+                if (networkDiscovery != null) networkDiscovery.StopDiscovery();
+                NetworkManager.Singleton.Shutdown();
+            }
+
             var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
             if (transport != null)
             {
-                // Force host to listen on all interfaces
                 transport.SetConnectionData("127.0.0.1", (ushort)7777, "0.0.0.0");
-                Debug.Log($"[NetworkManagerUI] Host transport configured to listen on 0.0.0.0:7777");
+                Debug.Log("[NetworkManagerUI] Host transport configured to listen on 0.0.0.0:7777");
             }
 
             if (NetworkManager.Singleton.StartHost())
@@ -44,8 +51,10 @@ public class NetworkManagerUI : MonoBehaviour
             }
             else
             {
-                if (statusText != null) statusText.text = "Failed to start Host.";
-                Debug.LogError("[NetworkManagerUI] NetworkManager.StartHost() returned false.");
+                NetworkManager.Singleton.Shutdown();
+                if (statusText != null)
+                    statusText.text = "Port 7777 in use. Close other instances or restart Unity.";
+                Debug.LogError("[NetworkManagerUI] StartHost failed — port 7777 is likely held by another process.");
             }
         });
         
@@ -236,26 +245,26 @@ public class NetworkManagerUI : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
+    private void ForceFullShutdown()
     {
+        if (networkDiscovery != null) networkDiscovery.StopDiscovery();
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnConnectSuccess;
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnConnectFailed;
-            
-            // Critical: Shut down the network manager if it's being destroyed
             if (NetworkManager.Singleton.IsListening)
-            {
-                NetworkManager.Singleton.Shutdown();
-            }
+                NetworkManager.Singleton.Shutdown(true);
         }
+    }
+
+    private void OnDestroy()
+    {
+        ForceFullShutdown();
     }
 
     private void OnApplicationQuit()
     {
-        // Hard shutdown to ensure no zombie processes remain
-        if (networkDiscovery != null) networkDiscovery.StopDiscovery();
-        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
+        ForceFullShutdown();
     }
 
     private void OnDisable()

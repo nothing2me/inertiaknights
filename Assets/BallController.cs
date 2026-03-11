@@ -26,6 +26,10 @@ public class BallController : NetworkBehaviour
     [SerializeField] public InputAction dashAction; // Define an input action for dashing
     [SerializeField] public InputAction groundSlamAction; // Define an input action for ground slam
     [SerializeField] public InputAction attackAction; // Define an input action for attack/lunge
+    [SerializeField] public InputAction brakeAction;
+
+    [Header("Brake Settings")]
+    [Range(0f, 1f)] public float brakeFriction = 0.15f;
 
     [Header("Dash Settings")]
     public float dashForce = 20f;
@@ -52,10 +56,12 @@ public class BallController : NetworkBehaviour
     public float enemyKnockbackForce = 2f; 
 
     private float lastAttackTime = -10f;
-    private bool attackTriggered = false; // Flag to pass input from Update to FixedUpdate
+    private bool attackTriggered = false;
     private System.Collections.Generic.HashSet<EnemyPlayer> enemiesInRange = new System.Collections.Generic.HashSet<EnemyPlayer>();
+    private System.Collections.Generic.HashSet<BossController> bossesInRange = new System.Collections.Generic.HashSet<BossController>();
     private EnemyPlayer currentTarget = null;
-    private EnemyPlayer initialDashTarget = null; // Store the target specifically for the homing phase
+    private Transform lungeTarget = null;
+    private Transform homingTarget = null;
     
     [Header("Network Data")]
     public NetworkVariable<Unity.Collections.FixedString32Bytes> playerName = new NetworkVariable<Unity.Collections.FixedString32Bytes>("Player", NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -73,17 +79,18 @@ public class BallController : NetworkBehaviour
         dashAction.Enable();
         groundSlamAction.Enable();
         attackAction.Enable();
+        brakeAction.Enable();
     }
 
     void OnDisable()
     {
-        // Disable the input actions when the object is disabled
         moveAction.Disable();
         jumpAction.Disable();
         respawnAction.Disable();
         dashAction.Disable();
         groundSlamAction.Disable();
         attackAction.Disable();
+        brakeAction.Disable();
     }
 
     void Start()
@@ -129,23 +136,21 @@ public class BallController : NetworkBehaviour
                 }
 
                 playerCameraController.SetTarget(transform);
+                playerCameraController.SetMoveAction(moveAction);
                 playerCameraController.SetActiveState(true);
 
-                // Tag this as the MainCamera for this client
                 if (playerCameraController.TryGetComponent<Camera>(out Camera cam))
                 {
                     cam.tag = "MainCamera";
                 }
-
-                Debug.Log($"Local camera unparented and enabled for {gameObject.name}");
             }
             else
             {
-                // Fallback for legacy global camera
                 playerCameraController = Object.FindFirstObjectByType<CameraController>();
                 if (playerCameraController != null)
                 {
                     playerCameraController.SetTarget(transform);
+                    playerCameraController.SetMoveAction(moveAction);
                     playerCameraController.SetActiveState(true);
                 }
             }
@@ -201,6 +206,7 @@ public class BallController : NetworkBehaviour
         dashAction.Disable();
         groundSlamAction.Disable();
         attackAction.Disable();
+        brakeAction.Disable();
     }
 
     void Update()
@@ -249,8 +255,16 @@ public class BallController : NetworkBehaviour
         // Apply force to the ball
         rb.AddForce(movement * speed);
 
-        // Check for ground
         bool isGrounded = Physics.Raycast(transform.position, Vector3.down, groundCheckDistance, groundLayer);
+
+        if (brakeAction.IsPressed() && isGrounded)
+        {
+            Vector3 vel = rb.linearVelocity;
+            vel.x *= brakeFriction;
+            vel.z *= brakeFriction;
+            rb.linearVelocity = vel;
+            rb.angularVelocity *= brakeFriction;
+        }
 
         // Update HUD stats
         if (scoreCounter != null)
@@ -297,14 +311,12 @@ public class BallController : NetworkBehaviour
             }
         }
 
-        // Apply Aimbot Homing if actively during a dash
-        if (homingStrength > 0 && initialDashTarget != null && initialDashTarget.gameObject.activeSelf)
+        if (homingStrength > 0 && homingTarget != null && homingTarget.gameObject.activeSelf)
         {
             float timeSinceDash = Time.time - lastAttackTime;
             if (timeSinceDash < homingDuration)
             {
-                // Calculate ideal direction towards target
-                Vector3 idealDirection = (initialDashTarget.transform.position - transform.position).normalized;
+                Vector3 idealDirection = (homingTarget.position - transform.position).normalized;
                 
                 // Gradually curve current velocity towards the ideal direction
                 Vector3 currentVelocity = rb.linearVelocity;
@@ -317,7 +329,7 @@ public class BallController : NetworkBehaviour
             }
             else
             {
-                initialDashTarget = null; // Homing phase ended
+                homingTarget = null;
             }
         }
 
@@ -327,119 +339,85 @@ public class BallController : NetworkBehaviour
 
     private void UpdateTargeting()
     {
-        EnemyPlayer nearestEnemy = null;
+        Transform nearest = null;
         float shortestDistance = Mathf.Infinity;
 
-        // Find the absolute closest enemy among those in range
         foreach (var enemy in enemiesInRange)
         {
             if (enemy == null || !enemy.gameObject.activeSelf) continue;
-
-            float distance = Vector3.Distance(transform.position, enemy.transform.position);
-            if (distance < shortestDistance)
-            {
-                shortestDistance = distance;
-                nearestEnemy = enemy;
-            }
+            float d = Vector3.Distance(transform.position, enemy.transform.position);
+            if (d < shortestDistance) { shortestDistance = d; nearest = enemy.transform; }
         }
 
-        // If our target changed
+        foreach (var boss in bossesInRange)
+        {
+            if (boss == null || !boss.gameObject.activeSelf) continue;
+            float d = Vector3.Distance(transform.position, boss.transform.position);
+            if (d < shortestDistance) { shortestDistance = d; nearest = boss.transform; }
+        }
+
+        EnemyPlayer nearestEnemy = nearest != null ? nearest.GetComponent<EnemyPlayer>() : null;
+
         if (nearestEnemy != currentTarget)
         {
-            // Un-target old
-            if (currentTarget != null)
-            {
-                currentTarget.SetTargeted(false);
-            }
-
-            // Target new
+            if (currentTarget != null) currentTarget.SetTargeted(false);
             currentTarget = nearestEnemy;
-
-            if (currentTarget != null)
-            {
-                currentTarget.SetTargeted(true);
-            }
+            if (currentTarget != null) currentTarget.SetTargeted(true);
         }
+
+        lungeTarget = nearest;
     }
 
     private void ManageEnemyUI()
     {
-        // Find all enemies currently in range
         Collider[] hitColliders = Physics.OverlapSphere(transform.position, attackRange);
-        System.Collections.Generic.HashSet<EnemyPlayer> currentEnemiesInRange = new System.Collections.Generic.HashSet<EnemyPlayer>();
+        var currentEnemies = new System.Collections.Generic.HashSet<EnemyPlayer>();
+        var currentBosses = new System.Collections.Generic.HashSet<BossController>();
 
-        foreach (var hitCollider in hitColliders)
+        foreach (var col in hitColliders)
         {
-            EnemyPlayer enemy = hitCollider.GetComponent<EnemyPlayer>();
+            EnemyPlayer enemy = col.GetComponent<EnemyPlayer>();
             if (enemy != null && enemy.gameObject.activeSelf)
-            {
-                currentEnemiesInRange.Add(enemy);
-            }
+                currentEnemies.Add(enemy);
+
+            BossController boss = col.GetComponent<BossController>();
+            if (boss != null && boss.gameObject.activeSelf)
+                currentBosses.Add(boss);
         }
 
-        // Hide UI for enemies that left the range
-        foreach (var enemy in enemiesInRange)
-        {
-            if (enemy != null && !currentEnemiesInRange.Contains(enemy))
-            {
-                enemy.SetUIVisibility(false);
-            }
-        }
+        foreach (var e in enemiesInRange)
+            if (e != null && !currentEnemies.Contains(e)) e.SetUIVisibility(false);
+        foreach (var e in currentEnemies)
+            if (e != null) e.SetUIVisibility(true);
 
-        // Show UI for enemies currently in range
-        foreach (var enemy in currentEnemiesInRange)
-        {
-            if (enemy != null)
-            {
-                enemy.SetUIVisibility(true);
-            }
-        }
+        foreach (var b in bossesInRange)
+            if (b != null && !currentBosses.Contains(b)) b.SetUIVisibility(false);
+        foreach (var b in currentBosses)
+            if (b != null) b.SetUIVisibility(true);
 
-        // Update the tracked list
-        enemiesInRange = currentEnemiesInRange;
+        enemiesInRange = currentEnemies;
+        bossesInRange = currentBosses;
     }
 
     private void PerformLunge()
     {
-        // Use the centrally managed nearest enemy target
-        if (currentTarget != null)
+        if (lungeTarget == null) return;
+
+        homingTarget = lungeTarget;
+
+        Rigidbody targetRb = lungeTarget.GetComponent<Rigidbody>();
+        Vector3 targetPosition = lungeTarget.position;
+
+        if (targetRb != null)
         {
-            // Store the target for homing logic
-            initialDashTarget = currentTarget;
-
-            // Get the Rigidbody of the enemy to read its velocity
-            Rigidbody enemyRb = currentTarget.GetComponent<Rigidbody>();
-            Vector3 targetPosition = currentTarget.transform.position;
-
-            if (enemyRb != null)
-            {
-                // Simple predictive aiming (First-Order Interception)
-                // Time to reach target = Distance / Speed
-                // We use our lunge impulse as an approximation of speed
-                float distance = Vector3.Distance(transform.position, targetPosition);
-                // Approximate lunge speed based on impulse over mass (assuming mass=1 for simplicity)
-                // Or just use the lungeForce directly as a flat rate
-                float estimatedTravelTime = distance / lungeForce; 
-                
-                // Predict where the enemy will be by adding their velocity multiplied by the time it takes us to reach them
-                targetPosition += enemyRb.linearVelocity * estimatedTravelTime;
-            }
-
-            // Calculate direction towards the *predicted* enemy location
-            Vector3 direction = targetPosition - transform.position;
-            direction.Normalize();
-
-            // Cancel out current vertical velocity so we don't curve mid-air while dashing downwards
-            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
-
-            // Lunge directly towards the predicted position
-            rb.AddForce(direction * lungeForce, ForceMode.Impulse);
-            Debug.Log($"Predictive Lunge & Aimbot engaged! Targeting {currentTarget.gameObject.name}.");
+            float distance = Vector3.Distance(transform.position, targetPosition);
+            float estimatedTravelTime = distance / lungeForce;
+            targetPosition += targetRb.linearVelocity * estimatedTravelTime;
         }
-        else
-        {
-            Debug.Log("No enemies in range for lunge.");
-        }
+
+        Vector3 direction = (targetPosition - transform.position).normalized;
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+        rb.AddForce(direction * lungeForce, ForceMode.Impulse);
     }
 
     private void OnTriggerEnter(Collider other)
@@ -510,49 +488,52 @@ public class BallController : NetworkBehaviour
             TakeDamage(1);
         }
 
-        // Handle damage to EnemyPlayer
+        // Handle damage to EnemyPlayer or BossController
+        float impactSpeed = collision.relativeVelocity.magnitude;
+        float damageAmount = impactSpeed * damageMultiplier;
+        bool hitEnemy = false;
+
         EnemyPlayer enemy = collision.gameObject.GetComponent<EnemyPlayer>();
-        if (enemy != null)
+        if (enemy != null && damageAmount > 0.1f)
         {
-            // Use the relative velocity of the impact rather than post-collision velocity
-            float impactSpeed = collision.relativeVelocity.magnitude;
-            float damageAmount = impactSpeed * damageMultiplier;
-            
-            if (damageAmount > 0.1f)
-            {
-                enemy.TakeDamage(damageAmount);
-            }
+            enemy.TakeDamage(damageAmount);
+            hitEnemy = true;
+        }
 
-            // Pool ball effect: Force the player to stop/dampen their bounce instead of flying away
+        BossController boss = collision.gameObject.GetComponent<BossController>();
+        if (boss != null && damageAmount > 0.1f)
+        {
+            boss.TakeDamage(damageAmount);
+            hitEnemy = true;
+        }
+
+        if (hitEnemy)
+        {
             rb.linearVelocity = rb.linearVelocity * playerImpactDampen;
-            rb.angularVelocity = rb.angularVelocity * playerImpactDampen; // Kill wild spin
+            rb.angularVelocity = rb.angularVelocity * playerImpactDampen;
 
-            // Knock the enemy back
-            Rigidbody enemyRb = enemy.GetComponent<Rigidbody>();
+            Rigidbody enemyRb = collision.gameObject.GetComponent<Rigidbody>();
             if (enemyRb != null && collision.contactCount > 0)
             {
-                // The contact normal points towards the player, so the negative normal points into the enemy
+                float knockbackMult = 1f;
+                BossController hitBoss = collision.gameObject.GetComponent<BossController>();
+                if (hitBoss != null)
+                    knockbackMult = 1f - hitBoss.knockbackResistance;
+
                 Vector3 pushDirection = -collision.contacts[0].normal;
-                
-                // Add a bit of upward lift so they fly back dramatically instead of scraping the ground
-                pushDirection.y = 0.5f; 
-                
-            // Apply force proportional to how hard we hit them
-                enemyRb.AddForce(pushDirection.normalized * impactSpeed * enemyKnockbackForce, ForceMode.Impulse);
+                pushDirection.y = 0.5f;
+                enemyRb.AddForce(pushDirection.normalized * impactSpeed * enemyKnockbackForce * knockbackMult, ForceMode.Impulse);
             }
         }
 
-        // Handle PVP damage to other players
         BallController otherPlayer = collision.gameObject.GetComponent<BallController>();
         if (otherPlayer != null && otherPlayer != this)
         {
-            float impactSpeed = collision.relativeVelocity.magnitude;
-            int damageAmount = Mathf.FloorToInt(impactSpeed * damageMultiplier);
+            int pvpDamage = Mathf.FloorToInt(impactSpeed * damageMultiplier);
             
-            if (damageAmount > 0)
+            if (pvpDamage > 0)
             {
-                // Tell the server to damage the other player
-                otherPlayer.TakeDamageServerRpc(damageAmount);
+                otherPlayer.TakeDamageServerRpc(pvpDamage);
             }
 
             // Knock the other player back
