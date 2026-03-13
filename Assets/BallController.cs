@@ -68,6 +68,7 @@ public class BallController : NetworkBehaviour
 
     private CameraController playerCameraController;
     private Rigidbody rb;
+    private BillboardSpriteAnimator spriteAnimator;
     private System.Collections.Generic.Dictionary<Collider, Color> originalColors = new System.Collections.Generic.Dictionary<Collider, Color>();
 
     void OnEnable()
@@ -97,6 +98,9 @@ public class BallController : NetworkBehaviour
     {
         // Get the Rigidbody component attached to the ball
         rb = GetComponent<Rigidbody>();
+
+        // Cache the billboard sprite animator (lives on a child quad)
+        spriteAnimator = GetComponentInChildren<BillboardSpriteAnimator>();
 
         // Prevent ball from falling through floor at high speeds
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -259,11 +263,15 @@ public class BallController : NetworkBehaviour
 
         if (brakeAction.IsPressed() && isGrounded)
         {
+            // Exponential decay: velocity bleeds off fast at high speed, gently near zero.
+            // brakeFriction is now a decay rate (units: 1/s). Higher = stops faster.
+            // e.g. brakeFriction = 8  →  ~99% speed shed in ~0.6 seconds.
+            float decay = Mathf.Exp(-brakeFriction * Time.fixedDeltaTime);
             Vector3 vel = rb.linearVelocity;
-            vel.x *= brakeFriction;
-            vel.z *= brakeFriction;
+            vel.x *= decay;
+            vel.z *= decay;
             rb.linearVelocity = vel;
-            rb.angularVelocity *= brakeFriction;
+            rb.angularVelocity *= decay;
         }
 
         // Update HUD stats
@@ -442,6 +450,9 @@ public class BallController : NetworkBehaviour
                 Debug.LogError("ScoreCounter reference is missing on BallController! Did you drag the ScoreCounter from the hierarchy into the Ball Inspector?");
             }
 
+            // Celebrate!
+            spriteAnimator?.TriggerGoal();
+
             // Visual feedback: Turn goal green and save original color
             MeshRenderer renderer = other.GetComponent<MeshRenderer>();
             if (renderer != null)
@@ -496,14 +507,18 @@ public class BallController : NetworkBehaviour
         EnemyPlayer enemy = collision.gameObject.GetComponent<EnemyPlayer>();
         if (enemy != null && damageAmount > 0.1f)
         {
+            bool killsEnemy = enemy.currentHealth.Value - damageAmount <= 0f;
             enemy.TakeDamage(damageAmount);
+            if (killsEnemy) spriteAnimator?.TriggerGoal();
             hitEnemy = true;
         }
 
         BossController boss = collision.gameObject.GetComponent<BossController>();
         if (boss != null && damageAmount > 0.1f)
         {
+            bool killsBoss = boss.currentHealth.Value - damageAmount <= 0f;
             boss.TakeDamage(damageAmount);
+            if (killsBoss) spriteAnimator?.TriggerGoal();
             hitEnemy = true;
         }
 
