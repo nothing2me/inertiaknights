@@ -45,6 +45,13 @@ public class BossGate : NetworkBehaviour
         Debug.Log($"[BossGate] {gameObject.name} unlocked!");
     }
 
+    /// <summary>Called by UnlockGateStep from any client. ServerRpc guarantees server-side execution.</summary>
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void UnlockServerRpc()
+    {
+        Unlock();
+    }
+
     private void OnLockStateChanged(bool previous, bool current)
     {
         ApplyVisualState(current);

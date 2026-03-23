@@ -49,6 +49,9 @@ public class EnemySpawn : NetworkBehaviour
     private bool encounterStarted = false;
     private bool encounterCleared = false;
 
+    /// <summary>Set by FreezeAIStep / AIFreezeManager to pause all AI logic.</summary>
+    [HideInInspector] public bool isFrozen = false;
+
     public override void OnNetworkSpawn()
     {
         if (!IsServer) return;
@@ -63,6 +66,7 @@ public class EnemySpawn : NetworkBehaviour
     void Update()
     {
         if (!IsServer) return;
+        if (isFrozen) return;
         if (spawnEntries == null || spawnEntries.Length == 0) return;
 
         CleanDeadEnemies();
@@ -119,7 +123,7 @@ public class EnemySpawn : NetworkBehaviour
         }
     }
 
-    private void StartEncounter()
+    public void StartEncounter()
     {
         if (encounterStarted) return;
         encounterStarted = true;
@@ -147,6 +151,13 @@ public class EnemySpawn : NetworkBehaviour
         Debug.Log($"[EnemySpawn] Encounter cleared at {gameObject.name}!");
         if (linkedGate != null)
             linkedGate.Unlock();
+    }
+
+    /// <summary>Called by SpawnEnemyStep from any client — ServerRpc ensures server-side execution.</summary>
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void StartEncounterServerRpc()
+    {
+        StartEncounter();
     }
 
     // --- Shared spawn logic ---

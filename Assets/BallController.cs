@@ -19,6 +19,10 @@ public class BallController : NetworkBehaviour
     private float lastDamageTime = -10f; // Initialize to allow immediate damage
     private Vector3 spawnPosition;
     private Quaternion spawnRotation;
+    /// <summary>Set by LockPlayerStep. Suppresses camera snap on respawn during cutscenes.</summary>
+    public bool isCutsceneLocked = false;
+    /// <summary>Exposes the camera controller to CutsceneContext without breaking encapsulation.</summary>
+    public CameraController CutsceneCameraRef => playerCameraController;
     [Header("Input Actions")]
     [SerializeField] public InputAction moveAction; // Define an input action for movement
     [SerializeField] public InputAction jumpAction; // Define an input action for jumping
@@ -27,6 +31,7 @@ public class BallController : NetworkBehaviour
     [SerializeField] public InputAction groundSlamAction; // Define an input action for ground slam
     [SerializeField] public InputAction attackAction; // Define an input action for attack/lunge
     [SerializeField] public InputAction brakeAction;
+    [SerializeField] public InputAction interactAction; // Interact with NPCs, objects, etc.
 
     [Header("Brake Settings")]
     [Range(0f, 1f)] public float brakeFriction = 0.15f;
@@ -81,6 +86,7 @@ public class BallController : NetworkBehaviour
         groundSlamAction.Enable();
         attackAction.Enable();
         brakeAction.Enable();
+        interactAction.Enable();
     }
 
     void OnDisable()
@@ -92,6 +98,7 @@ public class BallController : NetworkBehaviour
         groundSlamAction.Disable();
         attackAction.Disable();
         brakeAction.Disable();
+        interactAction.Disable();
     }
 
     void Start()
@@ -211,6 +218,7 @@ public class BallController : NetworkBehaviour
         groundSlamAction.Disable();
         attackAction.Disable();
         brakeAction.Disable();
+        interactAction.Disable();
     }
 
     void Update()
@@ -614,8 +622,8 @@ public class BallController : NetworkBehaviour
         transform.position = spawnPosition;
         transform.rotation = spawnRotation;
 
-        // Snap camera instantly to avoid jerk
-        if (playerCameraController != null) playerCameraController.SnapToTarget();
+        // Snap camera instantly to avoid jerk — but only if not locked by a cutscene
+        if (playerCameraController != null && !isCutsceneLocked) playerCameraController.SnapToTarget();
 
         // Reset speed and physics
         if (rb != null)

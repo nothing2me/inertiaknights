@@ -39,6 +39,9 @@ public class EnemyPlayer : NetworkBehaviour
     private float lastAttackTime = -10f;
     private bool isDashing = false;
     private bool isTargeted = false;
+
+    /// <summary>Set by FreezeAIStep / AIFreezeManager to pause AI simulation server-side.</summary>
+    [HideInInspector] public bool isFrozen = false;
     
     private Transform homeBase;
     private float timeSinceLastTarget = 0f;
@@ -194,6 +197,7 @@ public class EnemyPlayer : NetworkBehaviour
     {
         // Only the server runs AI logic
         if (!IsServer) return;
+        if (isFrozen) return;
 
         if (playerTransform == null || Time.frameCount % 60 == 0)
         {

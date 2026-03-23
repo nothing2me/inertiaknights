@@ -158,6 +158,9 @@ public class BossController : NetworkBehaviour
     private float DamageMult => IsRaging ? rageDamageMultiplier : 1f;
     private float CooldownMult => IsRaging ? rageCooldownMultiplier : 1f;
 
+    /// <summary>Set by FreezeAIStep / AIFreezeManager to pause AI simulation server-side.</summary>
+    [HideInInspector] public bool isFrozen = false;
+
     // ─── Lifecycle ────────────────────────────────────────────────
 
     void Start()
@@ -356,6 +359,7 @@ public class BossController : NetworkBehaviour
     {
         if (!IsServer) return;
         if (rb == null) return;
+        if (isFrozen) return;
 
         preCollisionVelocity = rb.linearVelocity;
         preCollisionAngular = rb.angularVelocity;
