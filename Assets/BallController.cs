@@ -597,7 +597,6 @@ public class BallController : NetworkBehaviour
                     rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
                 }
                 Debug.Log("Landed safely in a Hay Pile via Trigger! Movement unlocked.");
-                hayPile.OnPlayerLanded(this);
             }
         }
 
@@ -667,7 +666,6 @@ public class BallController : NetworkBehaviour
                     rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
                 }
                 Debug.Log("Landed safely in a Hay Pile! Movement unlocked.");
-                hayPile.OnPlayerLanded(this);
             }
             else if (((1 << collision.gameObject.layer) & groundLayer) != 0)
             {

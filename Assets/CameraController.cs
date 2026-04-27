@@ -100,24 +100,9 @@ public class CameraController : MonoBehaviour
         }
     }
 
-    [Header("Cinematic Override")]
-    public bool useFixedPosition = false;
-    public Vector3 fixedCameraPosition;
-    public bool lookAtTarget = false;
-
     void LateUpdate()
     {
         if (target == null) return;
-
-        if (useFixedPosition)
-        {
-            transform.position = fixedCameraPosition;
-            if (lookAtTarget)
-            {
-                transform.LookAt(target.position + pivotOffset);
-            }
-            return;
-        }
 
         currentPivotPosition = Vector3.SmoothDamp(
             currentPivotPosition,

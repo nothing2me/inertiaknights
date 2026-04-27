@@ -204,17 +204,9 @@ public class DialogueUI : MonoBehaviour
     {
         // Route interact key from the local player to Confirm()
         if (!_isShowing) return;
-
-        // Fallback: Check hardcoded E key in case the Input Action isn't bound correctly
-        if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.eKey.wasPressedThisFrame)
-        {
-            Confirm();
-            return;
-        }
-
         foreach (var b in FindObjectsByType<BallController>(FindObjectsSortMode.None))
         {
-            if (b.IsOwner && b.interactAction != null && b.interactAction.triggered)
+            if (b.IsOwner && b.interactAction.triggered)
             {
                 Confirm();
                 break;
