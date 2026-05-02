@@ -89,29 +89,38 @@ public class ClassSelectionUI : MonoBehaviour
         // Canvas group for fade
         canvasGroup = gameObject.AddComponent<CanvasGroup>();
 
+        // Content root for scaling
+        GameObject contentGO = CreateChild("Content", root);
+        RectTransform contentRT = contentGO.GetComponent<RectTransform>();
+        contentRT.anchorMin = Vector2.zero;
+        contentRT.anchorMax = Vector2.one;
+        contentRT.offsetMin = Vector2.zero;
+        contentRT.offsetMax = Vector2.zero;
+        contentRT.localScale = new Vector3(0.75f, 0.75f, 1f); // Scale down by 25%
+
         // ── Title ──
-        GameObject titleGO = CreateChild("Title", root);
+        GameObject titleGO = CreateChild("Title", contentRT);
         RectTransform titleRT = titleGO.GetComponent<RectTransform>();
         titleRT.anchorMin = new Vector2(0.5f, 1f);
         titleRT.anchorMax = new Vector2(0.5f, 1f);
         titleRT.pivot = new Vector2(0.5f, 1f);
-        titleRT.anchoredPosition = new Vector2(0, -30f);
+        titleRT.anchoredPosition = new Vector2(0, 60f); // Moved up to be just above the frames
         titleRT.sizeDelta = new Vector2(800, 80);
 
         TextMeshProUGUI titleText = titleGO.AddComponent<TextMeshProUGUI>();
         titleText.text = "CHOOSE THY CLASS";
-        titleText.fontSize = 64;
+        titleText.fontSize = 48; // Scaled down text size
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.color = Color.black;
         titleText.fontStyle = FontStyles.Bold;
 
         // ── Subtitle ──
-        GameObject subtitleGO = CreateChild("Subtitle", root);
+        GameObject subtitleGO = CreateChild("Subtitle", contentRT);
         RectTransform subRT = subtitleGO.GetComponent<RectTransform>();
         subRT.anchorMin = new Vector2(0.5f, 1f);
         subRT.anchorMax = new Vector2(0.5f, 1f);
         subRT.pivot = new Vector2(0.5f, 1f);
-        subRT.anchoredPosition = new Vector2(0, -100f);
+        subRT.anchoredPosition = new Vector2(0, 10f); // Moved up proportionally
         subRT.sizeDelta = new Vector2(800, 40);
 
         TextMeshProUGUI subText = subtitleGO.AddComponent<TextMeshProUGUI>();
@@ -121,7 +130,7 @@ public class ClassSelectionUI : MonoBehaviour
         subText.color = Color.black;
 
         // ── Card Container (horizontal layout) ──
-        GameObject containerGO = CreateChild("CardContainer", root);
+        GameObject containerGO = CreateChild("CardContainer", contentRT);
         RectTransform containerRT = containerGO.GetComponent<RectTransform>();
         containerRT.anchorMin = new Vector2(0.5f, 0.5f);
         containerRT.anchorMax = new Vector2(0.5f, 0.5f);
@@ -173,7 +182,7 @@ public class ClassSelectionUI : MonoBehaviour
             });
 
         // ── AI Team Toggle (Placed to the right of the cards) ──
-        GameObject toggleGO = CreateChild("AIToggle", root);
+        GameObject toggleGO = CreateChild("AIToggle", contentRT);
         RectTransform toggleRT = toggleGO.GetComponent<RectTransform>();
         toggleRT.anchorMin = new Vector2(0.5f, 0.5f);
         toggleRT.anchorMax = new Vector2(0.5f, 0.5f);
@@ -217,6 +226,10 @@ public class ClassSelectionUI : MonoBehaviour
         aiToggle.targetGraphic = bgImg;
         aiToggle.graphic = checkmarkImg;
         aiToggle.isOn = false;
+
+        // Ensure title and subtitle render ON TOP of everything else just in case
+        titleGO.transform.SetAsLastSibling();
+        subtitleGO.transform.SetAsLastSibling();
     }
 
     // ─── Card Builder ─────────────────────────────────────────────

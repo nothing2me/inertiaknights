@@ -61,6 +61,13 @@ public class PlayerClassManager : MonoBehaviour
 
         // Unlock movement
         ball.movementLocked = false;
+        
+        // Re-enable player visuals
+        MeshRenderer mesh = ball.GetComponent<MeshRenderer>();
+        if (mesh != null) mesh.enabled = true;
+        
+        BillboardSpriteAnimator billboard = ball.GetComponentInChildren<BillboardSpriteAnimator>(true);
+        if (billboard != null) billboard.gameObject.SetActive(true);
 
         // If falling from the sky, set the camera to look up from the hay pile
         if (ball.isFallingFromSky && ball.CutsceneCameraRef != null)
@@ -108,6 +115,13 @@ public class PlayerClassManager : MonoBehaviour
         // Create the selection UI (only for local human player)
         if (ball.IsOwner && ball.NetworkObject.IsPlayerObject)
         {
+            // Hide player visuals initially
+            MeshRenderer mesh = ball.GetComponent<MeshRenderer>();
+            if (mesh != null) mesh.enabled = false;
+            
+            BillboardSpriteAnimator billboard = ball.GetComponentInChildren<BillboardSpriteAnimator>(true);
+            if (billboard != null) billboard.gameObject.SetActive(false);
+
             StartCoroutine(ShowSelectionUIDelayed());
         }
         else if (!ball.NetworkObject.IsPlayerObject)

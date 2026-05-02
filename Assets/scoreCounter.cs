@@ -31,6 +31,48 @@ public class ScoreCounter : MonoBehaviour
 
     void Start()
     {
+        if (scoreText != null)
+        {
+            Canvas canvas = scoreText.GetComponentInParent<Canvas>();
+            if (canvas != null)
+            {
+                UnityEngine.UI.CanvasScaler scaler = canvas.GetComponent<UnityEngine.UI.CanvasScaler>();
+                if (scaler == null) scaler = canvas.gameObject.AddComponent<UnityEngine.UI.CanvasScaler>();
+                scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(1920, 1080);
+                scaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                scaler.matchWidthOrHeight = 0.5f;
+
+                // Move directly under Canvas to escape any hidden/masked layout groups
+                scoreText.transform.SetParent(canvas.transform, false);
+            }
+
+            // Reposition scoreText to Top-Left nicely
+            RectTransform rt = scoreText.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0f, 1f);
+                rt.anchorMax = new Vector2(0f, 1f);
+                rt.pivot = new Vector2(0f, 1f);
+                // Move it even further down so FPS isn't cut off at the top
+                rt.anchoredPosition = new Vector2(250, -150);
+                rt.sizeDelta = new Vector2(800, 600); 
+                rt.localScale = Vector3.one;          
+                rt.localRotation = Quaternion.identity;
+            }
+            
+            // CRITICAL: Disable Auto-Sizing so the text doesn't balloon up to fill the 800x600 box
+            scoreText.enableAutoSizing = false;
+            scoreText.fontSize = 24;
+            scoreText.alignment = TextAlignmentOptions.TopLeft;
+            scoreText.overflowMode = TextOverflowModes.Overflow; 
+            scoreText.margin = Vector4.zero; 
+            scoreText.raycastTarget = false; 
+            
+            // Hide initially until the game actually starts
+            scoreText.gameObject.SetActive(false);
+        }
+
         UpdateHUDText();
     }
 
@@ -45,6 +87,13 @@ public class ScoreCounter : MonoBehaviour
         currentSpeed = speed;
         canJump = jumpReady;
         currentHealth = health;
+        
+        // Show HUD now that stats are being actively updated
+        if (scoreText != null && !scoreText.gameObject.activeSelf)
+        {
+            scoreText.gameObject.SetActive(true);
+        }
+
         UpdateHUDText();
     }
 

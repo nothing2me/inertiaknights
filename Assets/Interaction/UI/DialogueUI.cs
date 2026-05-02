@@ -40,6 +40,71 @@ public class DialogueUI : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // --- Auto-configure Canvas Scaling ---
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+        {
+            UnityEngine.UI.CanvasScaler scaler = canvas.GetComponent<UnityEngine.UI.CanvasScaler>();
+            if (scaler == null) scaler = canvas.gameObject.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        // --- Auto-center the Dialogue Panel at the bottom ---
+        if (panel != null)
+        {
+            RectTransform rt = panel.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0.5f, 0f); // Bottom center
+                rt.anchorMax = new Vector2(0.5f, 0f);
+                rt.pivot = new Vector2(0.5f, 0f); // Bottom center pivot
+                rt.anchoredPosition = new Vector2(0, 40); // 40 units of padding from the bottom edge
+                // Provide a reasonably large default size
+                rt.sizeDelta = new Vector2(1000, 300); 
+            }
+
+            // --- Rounded Corners and Stroke ---
+            Image panelImage = panel.GetComponent<Image>();
+            if (panelImage != null)
+            {
+                panelImage.type = Image.Type.Sliced;
+                // Generate a 128x128 rounded rect with 32px radius and 4px stroke
+                panelImage.sprite = CreateRoundedStrokeSprite(128, 128, 32, 4, new Color(0.1f, 0.1f, 0.1f, 0.95f), Color.white);
+                panelImage.color = Color.white; // Set to white so we see our exact generated colors
+            }
+        }
+
+        // --- Ensure Continue Prompt is Inside the Frame ---
+        if (continuePrompt != null && panel != null)
+        {
+            RectTransform promptRt = continuePrompt.GetComponent<RectTransform>();
+            if (promptRt != null)
+            {
+                promptRt.SetParent(panel.transform, false);
+                promptRt.anchorMin = new Vector2(1f, 0f); // Bottom right
+                promptRt.anchorMax = new Vector2(1f, 0f);
+                promptRt.pivot = new Vector2(1f, 0f);
+                promptRt.anchoredPosition = new Vector2(-30, 20); // Pad from the bottom right corner
+            }
+            
+            // Make the prompt text larger as requested
+            TextMeshProUGUI promptTMP = continuePrompt.GetComponentInChildren<TextMeshProUGUI>();
+            if (promptTMP != null)
+            {
+                // Force a larger sizeDelta so the text has room to be big
+                RectTransform promptRT = promptTMP.GetComponent<RectTransform>();
+                if (promptRT != null) promptRT.sizeDelta = new Vector2(400, 100);
+
+                promptTMP.enableAutoSizing = false; // Stop it from shrinking to fit a tiny prefab box
+                promptTMP.fontSize = 36;            // Even larger now
+                promptTMP.color = Color.yellow; 
+            }
+        }
+
         panel?.SetActive(false);
     }
 
@@ -220,5 +285,26 @@ public class DialogueUI : MonoBehaviour
                 break;
             }
         }
+    }
+
+    private Sprite CreateRoundedStrokeSprite(int width, int height, int radius, int strokeWidth, Color fillColor, Color strokeColor)
+    {
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        Color[] pixels = new Color[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float dx = Mathf.Max(0, radius - x, x - (width - radius));
+                float dy = Mathf.Max(0, radius - y, y - (height - radius));
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                if (dist > radius) pixels[y * width + x] = Color.clear;
+                else if (dist > radius - strokeWidth) pixels[y * width + x] = strokeColor;
+                else pixels[y * width + x] = fillColor;
+            }
+        }
+        texture.SetPixels(pixels);
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius, radius, radius, radius));
     }
 }
