@@ -16,11 +16,51 @@ public class NetworkManagerUI : MonoBehaviour
     public static string LocalPlayerName = "Player";
 
     // ─── Cross-Scene Auto-Start ──────────────────────────────────
-    // Set these from MainMenuRPGSetup before loading MainScene.
-    // NetworkManagerUI.Start() will pick them up and auto-connect.
     public static bool   AutoStartAsHost   = false;
     public static bool   AutoStartAsClient  = false;
-    public static string AutoConnectIP      = "";   // empty = LAN search, otherwise direct IP
+    public static string AutoConnectIP      = "";
+
+    public class NetworkRunner : MonoBehaviour
+    {
+        public bool isHost;
+        public string connectIp;
+
+        void Awake()
+        {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            if (scene.name == "MainScene")
+            {
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+                
+                if (NetworkManager.Singleton != null)
+                {
+                    if (isHost)
+                    {
+                        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+                        if (transport != null) transport.SetConnectionData("127.0.0.1", 7777, "0.0.0.0");
+                        NetworkManager.Singleton.StartHost();
+                        Debug.Log("[NetworkRunner] Started Host successfully.");
+                    }
+                    else
+                    {
+                        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+                        if (transport != null)
+                        {
+                            string ip = string.IsNullOrWhiteSpace(connectIp) ? "127.0.0.1" : connectIp;
+                            transport.SetConnectionData(ip, 7777);
+                        }
+                        NetworkManager.Singleton.StartClient();
+                        Debug.Log("[NetworkRunner] Started Client successfully.");
+                    }
+                }
+                Destroy(gameObject);
+            }
+        }
+    }
 
     private void Awake()
     {

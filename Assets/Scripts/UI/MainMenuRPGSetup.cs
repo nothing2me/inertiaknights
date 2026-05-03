@@ -534,8 +534,84 @@ public class MainMenuRPGSetup : MonoBehaviour
         NetworkManagerUI.AutoStartAsHost  = true;
         NetworkManagerUI.AutoStartAsClient = false;
         NetworkManagerUI.AutoConnectIP    = "";
-        Debug.Log("[MainMenuRPG] Queueing Host → loading MainScene.");
-        SceneManager.LoadScene(SceneGame);
+        
+        GameObject runner = new GameObject("NetworkRunner");
+        DontDestroyOnLoad(runner);
+        var r = runner.AddComponent<NetworkManagerUI.NetworkRunner>();
+        r.isHost = true;
+
+        Debug.Log("[MainMenuRPG] Queueing Host → loading MainScene with roll-up animation.");
+        StartCoroutine(RollUpAndLoad(SceneGame));
+    }
+
+    private IEnumerator RollUpAndLoad(string sceneName)
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) canvas = Object.FindFirstObjectByType<Canvas>();
+
+        if (canvas != null)
+        {
+            canvas.transform.SetParent(null);
+            DontDestroyOnLoad(canvas.gameObject);
+            canvas.sortingOrder = 999;
+        }
+
+        // We do NOT call this.transform.SetParent(null) because if this script is on a UI element, 
+        // it would rip it out of the Canvas. Instead, we just trust the Canvas DontDestroyOnLoad.
+
+        RectTransform container = null;
+        if (canvas != null)
+        {
+            GameObject containerGO = new GameObject("ScrollContainer", typeof(RectTransform));
+            container = containerGO.GetComponent<RectTransform>();
+            container.SetParent(canvas.transform, false);
+            
+            container.anchorMin = Vector2.zero;
+            container.anchorMax = Vector2.one;
+            container.offsetMin = Vector2.zero;
+            container.offsetMax = Vector2.zero;
+
+            List<Transform> childrenToMove = new List<Transform>();
+            foreach (Transform child in canvas.transform)
+            {
+                if (child != container) childrenToMove.Add(child);
+            }
+            foreach (Transform child in childrenToMove)
+            {
+                child.SetParent(container, true);
+            }
+        }
+
+        AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
+        while (!asyncLoad.isDone)
+        {
+            yield return null;
+        }
+
+        // Yield an extra frame so StartHost() and any intense Awake() calls can finish and thaw the main thread
+        yield return null;
+        yield return null;
+
+        if (container != null)
+        {
+            float duration = 0.8f;
+            float elapsed = 0f;
+            
+            while (elapsed < duration)
+            {
+                // Cap delta time to prevent massive lag spikes (like loading a scene) from skipping the entire animation!
+                float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+                elapsed += dt;
+
+                float t = Mathf.Clamp01(elapsed / duration);
+                float ease = t * t * t; // Cubic ease-in
+
+                container.anchoredPosition = new Vector2(0, ease * Screen.height * 1.5f);
+                yield return null;
+            }
+        }
+
+        if (canvas != null) Destroy(canvas.gameObject);
     }
 
     /// <summary>JOIN GAME — toggles the IP panel so user can enter an address or just hit Connect for LAN.</summary>
@@ -548,8 +624,15 @@ public class MainMenuRPGSetup : MonoBehaviour
             NetworkManagerUI.AutoStartAsClient = true;
             NetworkManagerUI.AutoStartAsHost   = false;
             NetworkManagerUI.AutoConnectIP     = "";
-            Debug.Log("[MainMenuRPG] Queueing LAN Join → loading MainScene.");
-            SceneManager.LoadScene(SceneGame);
+            
+            GameObject runner = new GameObject("NetworkRunner");
+            DontDestroyOnLoad(runner);
+            var r = runner.AddComponent<NetworkManagerUI.NetworkRunner>();
+            r.isHost = false;
+            r.connectIp = "";
+
+            Debug.Log("[MainMenuRPG] Discovery found a server. Queueing Join → loading MainScene with roll-up animation.");
+            StartCoroutine(RollUpAndLoad(SceneGame));
             return;
         }
         bool nowVisible = !joinPanel.activeSelf;
@@ -568,8 +651,15 @@ public class MainMenuRPGSetup : MonoBehaviour
         NetworkManagerUI.AutoStartAsClient = true;
         NetworkManagerUI.AutoStartAsHost   = false;
         NetworkManagerUI.AutoConnectIP     = ip;
-        Debug.Log($"[MainMenuRPG] Queueing Client (IP='{ip}') → loading MainScene.");
-        SceneManager.LoadScene(SceneGame);
+        
+        GameObject runner = new GameObject("NetworkRunner");
+        DontDestroyOnLoad(runner);
+        var r = runner.AddComponent<NetworkManagerUI.NetworkRunner>();
+        r.isHost = false;
+        r.connectIp = ip;
+
+        Debug.Log($"[MainMenuRPG] Queueing direct IP Join ({ip}) → loading MainScene with roll-up animation.");
+        StartCoroutine(RollUpAndLoad(SceneGame));
     }
 
     /// <summary>QUIT — closes the application.</summary>

@@ -62,10 +62,6 @@ public class PlayerClassManager : MonoBehaviour
         // Unlock movement
         ball.movementLocked = false;
         
-        // Re-enable player visuals
-        MeshRenderer mesh = ball.GetComponent<MeshRenderer>();
-        if (mesh != null) mesh.enabled = true;
-        
         BillboardSpriteAnimator billboard = ball.GetComponentInChildren<BillboardSpriteAnimator>(true);
         if (billboard != null) billboard.gameObject.SetActive(true);
 
@@ -115,12 +111,16 @@ public class PlayerClassManager : MonoBehaviour
         // Create the selection UI (only for local human player)
         if (ball.IsOwner && ball.NetworkObject.IsPlayerObject)
         {
-            // Hide player visuals initially
+            // Hide player mesh but keep billboard active for the wisp
             MeshRenderer mesh = ball.GetComponent<MeshRenderer>();
             if (mesh != null) mesh.enabled = false;
             
             BillboardSpriteAnimator billboard = ball.GetComponentInChildren<BillboardSpriteAnimator>(true);
-            if (billboard != null) billboard.gameObject.SetActive(false);
+            if (billboard != null)
+            {
+                billboard.gameObject.SetActive(true);
+                billboard.SetClassSprite(-1); // Show default wisp
+            }
 
             StartCoroutine(ShowSelectionUIDelayed());
         }
@@ -131,20 +131,27 @@ public class PlayerClassManager : MonoBehaviour
         }
     }
 
+    public void AssignRandomClass()
+    {
+        if (IsClassChosen) return;
+        PlayerClassType[] classes = { PlayerClassType.Light, PlayerClassType.Healer, PlayerClassType.Tank };
+        PlayerClassType randomClass = classes[Random.Range(0, classes.Length)];
+        Debug.Log($"[ClassSystem] Assigning random class {randomClass} because player hit ground without choosing.");
+        SelectClass(randomClass, true); // spawnBots=true so it populates if host
+    }
+
     private IEnumerator ShowSelectionUIDelayed()
     {
         // Wait a beat so the scene settles (camera, spawn, etc.)
         yield return new WaitForSeconds(0.5f);
 
-        Canvas canvas = Object.FindFirstObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            Debug.LogError("[ClassSystem] No Canvas found in scene for class selection UI!");
-            yield break;
-        }
-
         GameObject uiGO = new GameObject("ClassSelectionUI");
-        uiGO.transform.SetParent(canvas.transform, false);
+        Canvas uiCanvas = uiGO.AddComponent<Canvas>();
+        uiCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        uiCanvas.sortingOrder = 10; // Ensure it's on top of gameplay but behind main menu if overlapping
+        uiGO.AddComponent<UnityEngine.UI.CanvasScaler>();
+        uiGO.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
         selectionUI = uiGO.AddComponent<ClassSelectionUI>();
         selectionUI.Initialize(this);
     }

@@ -72,6 +72,8 @@ public class NPCDirectionalBillboard : MonoBehaviour
     private Transform rootTransform;
     private Rigidbody rb;
     private NavMeshAgent agent;
+    private Mesh mesh;
+    private Vector2[] uvs = new Vector2[4];
 
     private AnimState curState = AnimState.IdleReverse;
     private LastDir lastDir = LastDir.Reverse;
@@ -80,13 +82,13 @@ public class NPCDirectionalBillboard : MonoBehaviour
 
     void Awake()
     {
-        mat = new Material(Shader.Find("Unlit/Transparent"));
+        mat = new Material(Shader.Find("Sprites/Default"));
         if (spritesheet != null)
         {
             mat.mainTexture = spritesheet;
         }
         GetComponent<MeshRenderer>().material = mat;
-        mat.mainTextureScale = new Vector2(1f / cols, 1f / rows);
+        mesh = GetComponent<MeshFilter>().mesh;
     }
 
     void Start()
@@ -224,9 +226,16 @@ public class NPCDirectionalBillboard : MonoBehaviour
         var cell = FRAME_CELLS[fid];
 
         int uvRow = (rows - 1) - cell.row;
-        float offX = cell.col * (1f / cols);
-        float offY = uvRow * (1f / rows);
-        mat.mainTextureOffset = new Vector2(offX, offY);
+        float scaleX = 1f / cols;
+        float scaleY = 1f / rows;
+        float offX = cell.col * scaleX;
+        float offY = uvRow * scaleY;
+        
+        uvs[0] = new Vector2(offX, offY);                   // Bottom Left
+        uvs[1] = new Vector2(offX + scaleX, offY);          // Bottom Right
+        uvs[2] = new Vector2(offX, offY + scaleY);          // Top Left
+        uvs[3] = new Vector2(offX + scaleX, offY + scaleY); // Top Right
+        mesh.uv = uvs;
 
         Vector3 s = transform.localScale;
         s.x = anim.mirror ? -spriteWidth : spriteWidth;

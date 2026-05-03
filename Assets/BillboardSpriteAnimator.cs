@@ -23,6 +23,9 @@ public class BillboardSpriteAnimator : MonoBehaviour
     public Texture2D lightClassSpritesheet;
     public Texture2D tankClassSpritesheet;
     public Texture2D healerClassSpritesheet;
+    public Texture2D defaultFallingSprite;
+    
+    private bool isDefaultWisp = false;
 
     // ── Animation ────────────────────────────────────────────────
     [Header("Animation")]
@@ -105,6 +108,8 @@ public class BillboardSpriteAnimator : MonoBehaviour
     private Material   mat;
     private Camera     cam;
     private Transform  followTarget;  // the ball transform we trail (unparented at runtime)
+    private Mesh       mesh;
+    private Vector2[]  uvs = new Vector2[4];
 
     private AnimState  curState   = AnimState.IdleReverse;
     private LastDir    lastDir    = LastDir.Reverse;
@@ -122,12 +127,12 @@ public class BillboardSpriteAnimator : MonoBehaviour
     void Awake()
     {
         // Build a dedicated material so we don't mutate any shared asset
-        mat = new Material(Shader.Find("Unlit/Transparent"));
+        mat = new Material(Shader.Find("Sprites/Default"));
         if (spritesheet != null) mat.mainTexture = spritesheet;
         GetComponent<MeshRenderer>().material = mat;
 
-        // Tile size is constant — set once here
-        mat.mainTextureScale = new Vector2(1f / cols, 1f / rows);
+        // Get instance of the mesh so we can modify UVs directly (Sprites/Default ignores mat.mainTextureScale/Offset)
+        mesh = GetComponent<MeshFilter>().mesh;
     }
 
     void Start()
@@ -191,8 +196,14 @@ public class BillboardSpriteAnimator : MonoBehaviour
     public void SetClassSprite(int classIndex)
     {
         Texture2D newTex = spritesheet; // Default fallback
+        isDefaultWisp = false;
         
-        if (classIndex == 1 && lightClassSpritesheet != null) newTex = lightClassSpritesheet;
+        if (classIndex <= 0 && defaultFallingSprite != null) 
+        {
+            newTex = defaultFallingSprite;
+            isDefaultWisp = true;
+        }
+        else if (classIndex == 1 && lightClassSpritesheet != null) newTex = lightClassSpritesheet;
         else if (classIndex == 2 && healerClassSpritesheet != null) newTex = healerClassSpritesheet;
         else if (classIndex == 3 && tankClassSpritesheet != null) newTex = tankClassSpritesheet;
 
@@ -322,15 +333,43 @@ public class BillboardSpriteAnimator : MonoBehaviour
 
     void ApplyFrame()
     {
+        if (isDefaultWisp)
+        {
+            int fid_wisp = Mathf.FloorToInt(Time.time * fps) % 2;
+            float scaleX_wisp = 1f / 2f;
+            float scaleY_wisp = 1f;
+            float offX_wisp = fid_wisp * scaleX_wisp;
+            float offY_wisp = 0f;
+            
+            uvs[0] = new Vector2(offX_wisp, offY_wisp);
+            uvs[1] = new Vector2(offX_wisp + scaleX_wisp, offY_wisp);
+            uvs[2] = new Vector2(offX_wisp, offY_wisp + scaleY_wisp);
+            uvs[3] = new Vector2(offX_wisp + scaleX_wisp, offY_wisp + scaleY_wisp);
+            mesh.uv = uvs;
+            
+            Vector3 wispScale = transform.localScale;
+            wispScale.x = spriteWidth;
+            transform.localScale = wispScale;
+            return;
+        }
+
         var anim   = ANIMS[(int)curState];
         int fid    = anim.frames[frameIdx % anim.frames.Length];
         var cell   = FRAME_CELLS[fid];
 
         // Unity UVs start bottom-left; spritesheet row 0 is at the TOP → flip row
         int uvRow  = (rows - 1) - cell.row;
-        float offX = cell.col * (1f / cols);
-        float offY = uvRow    * (1f / rows);
-        mat.mainTextureOffset = new Vector2(offX, offY);
+        float scaleX = 1f / cols;
+        float scaleY = 1f / rows;
+        float offX = cell.col * scaleX;
+        float offY = uvRow    * scaleY;
+        
+        // Sprites/Default ignores material offset/scale, so we slice by modifying the mesh UVs directly
+        uvs[0] = new Vector2(offX, offY);                   // Bottom Left
+        uvs[1] = new Vector2(offX + scaleX, offY);          // Bottom Right
+        uvs[2] = new Vector2(offX, offY + scaleY);          // Top Left
+        uvs[3] = new Vector2(offX + scaleX, offY + scaleY); // Top Right
+        mesh.uv = uvs;
 
         // Mirror by flipping local X scale (left-walk variants)
         Vector3 s = transform.localScale;

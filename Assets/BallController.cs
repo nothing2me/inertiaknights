@@ -668,12 +668,22 @@ public class BallController : NetworkBehaviour
                 }
                 Debug.Log("Landed safely in a Hay Pile! Movement unlocked.");
                 hayPile.OnPlayerLanded(this);
+                
+                if (classManager != null && !classManager.IsClassChosen)
+                {
+                    classManager.AssignRandomClass();
+                }
             }
             else if (((1 << collision.gameObject.layer) & groundLayer) != 0)
             {
                 // Missed the hay pile and hit the ground!
                 isFallingFromSky = false;
                 Debug.Log("Missed the hay pile and hit the ground! Movement unlocked anyway.");
+                
+                if (classManager != null && !classManager.IsClassChosen)
+                {
+                    classManager.AssignRandomClass();
+                }
             }
         }
 

@@ -156,9 +156,9 @@ MonoBehaviour:
   invertY: 0
   minPitch: 0
   maxPitch: 80
-  targetDistance: 10.52
+  targetDistance: 7
   minFollowDistance: 2
-  maxFollowDistance: 20
+  maxFollowDistance: 12
   maxRollTilt: 10
   maxPitchLean: 5
   tiltSmoothTime: 0.5
@@ -171,6 +171,9 @@ MonoBehaviour:
     m_Bits: 4294967295
   cameraRadius: 1
   collisionBuffer: 0.1
+  useFixedPosition: 0
+  fixedCameraPosition: {x: 0, y: 0, z: 0}
+  lookAtTarget: 0
 --- !u!1 &3529131377540620585
 GameObject:
   m_ObjectHideFlags: 0
@@ -303,6 +306,7 @@ MonoBehaviour:
   lightClassSpritesheet: {fileID: 2800000, guid: 0ed4773b71e06fd40a4e1b79273863d8, type: 3}
   tankClassSpritesheet: {fileID: 2800000, guid: 72e5784bb76e58e4594baa04a0bd56a0, type: 3}
   healerClassSpritesheet: {fileID: 2800000, guid: 2204b1bae7d0ef74dbca884df46adf41, type: 3}
+  defaultFallingSprite: {fileID: 2800000, guid: ff572ad5e6a8004438d3d501caf06aae, type: 3}
   fps: 8
   moveThreshold: 1.5
   fallVelocityThreshold: -2
@@ -369,7 +373,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4172051811853493982}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -471,7 +475,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 299332544
+  GlobalObjectIdHash: 3671802159
   InScenePlacedSourceGlobalObjectIdHash: 3671802159
   DeferredDespawnTick: 0
   Ownership: 1
