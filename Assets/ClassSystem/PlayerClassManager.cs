@@ -65,18 +65,6 @@ public class PlayerClassManager : MonoBehaviour
         BillboardSpriteAnimator billboard = ball.GetComponentInChildren<BillboardSpriteAnimator>(true);
         if (billboard != null) billboard.gameObject.SetActive(true);
 
-        // If falling from the sky, set the camera to look up from the hay pile
-        if (ball.isFallingFromSky && ball.CutsceneCameraRef != null)
-        {
-            HayPile hp = Object.FindFirstObjectByType<HayPile>();
-            if (hp != null)
-            {
-                ball.CutsceneCameraRef.useFixedPosition = true;
-                // Offset the camera slightly away and up from the hay pile center
-                ball.CutsceneCameraRef.fixedCameraPosition = hp.transform.position + new Vector3(8f, 2f, 8f);
-                ball.CutsceneCameraRef.lookAtTarget = true;
-            }
-        }
 
         // Hide the selection UI
         if (selectionUI != null)

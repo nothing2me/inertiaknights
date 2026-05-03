@@ -13,8 +13,12 @@ public class BossGate : NetworkBehaviour
     public Collider blockingCollider;
     [Tooltip("Optional renderer to tint locked/unlocked. Leave empty to skip.")]
     public Renderer gateRenderer;
+    [Tooltip("Optional Animator to play opening/closing animations.")]
+    public Animator gateAnimator;
 
-    [Header("Visuals")]
+    [Header("Visuals & Animation")]
+    public string openTriggerName = "Open";
+    public string closeTriggerName = "Close";
     public Color lockedColor = new Color(1f, 0.2f, 0.2f, 0.8f);
     public Color unlockedColor = new Color(0.2f, 1f, 0.2f, 0.4f);
 
@@ -66,6 +70,14 @@ public class BossGate : NetworkBehaviour
         {
             propBlock.SetColor("_BaseColor", locked ? lockedColor : unlockedColor);
             gateRenderer.SetPropertyBlock(propBlock);
+        }
+
+        if (gateAnimator != null)
+        {
+            if (locked && !string.IsNullOrEmpty(closeTriggerName))
+                gateAnimator.SetTrigger(closeTriggerName);
+            else if (!locked && !string.IsNullOrEmpty(openTriggerName))
+                gateAnimator.SetTrigger(openTriggerName);
         }
     }
 }
