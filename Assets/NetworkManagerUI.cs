@@ -15,6 +15,13 @@ public class NetworkManagerUI : MonoBehaviour
 
     public static string LocalPlayerName = "Player";
 
+    // ─── Cross-Scene Auto-Start ──────────────────────────────────
+    // Set these from MainMenuRPGSetup before loading MainScene.
+    // NetworkManagerUI.Start() will pick them up and auto-connect.
+    public static bool   AutoStartAsHost   = false;
+    public static bool   AutoStartAsClient  = false;
+    public static string AutoConnectIP      = "";   // empty = LAN search, otherwise direct IP
+
     private void Awake()
     {
         // Auto-find fallback for NetworkDiscovery if not assigned in Inspector
@@ -26,36 +33,7 @@ public class NetworkManagerUI : MonoBehaviour
 
         hostButton.onClick.AddListener(() => {
             Debug.Log("[NetworkManagerUI] Host button clicked.");
-            UpdateLocalName();
-
-            // Defensive: fully shut down any stale session that may be holding the port
-            if (NetworkManager.Singleton.IsListening)
-            {
-                Debug.Log("[NetworkManagerUI] Shutting down stale session before hosting.");
-                if (networkDiscovery != null) networkDiscovery.StopDiscovery();
-                NetworkManager.Singleton.Shutdown();
-            }
-
-            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            if (transport != null)
-            {
-                transport.SetConnectionData("127.0.0.1", (ushort)7777, "0.0.0.0");
-                Debug.Log("[NetworkManagerUI] Host transport configured to listen on 0.0.0.0:7777");
-            }
-
-            if (NetworkManager.Singleton.StartHost())
-            {
-                if (networkDiscovery != null) networkDiscovery.StartBroadcasting();
-                gameObject.SetActive(false);
-                Debug.Log("[NetworkManagerUI] Host started successfully.");
-            }
-            else
-            {
-                NetworkManager.Singleton.Shutdown();
-                if (statusText != null)
-                    statusText.text = "Port 7777 in use. Close other instances or restart Unity.";
-                Debug.LogError("[NetworkManagerUI] StartHost failed — port 7777 is likely held by another process.");
-            }
+            DoStartHost();
         });
         
         clientButton.onClick.AddListener(() => {
@@ -77,6 +55,80 @@ public class NetworkManagerUI : MonoBehaviour
         {
             NetworkManager.Singleton.OnClientConnectedCallback += OnConnectSuccess;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnConnectFailed;
+        }
+    }
+
+    private void Start()
+    {
+        // ── Auto-start from MainMenu scene flags ─────────────────────
+        if (AutoStartAsHost)
+        {
+            AutoStartAsHost = false;
+            Debug.Log("[NetworkManagerUI] Auto-starting as Host (from MainMenu).");
+            // Directly execute the host logic (same as the host button click handler)
+            DoStartHost();
+            return;
+        }
+        
+        if (AutoStartAsClient)
+        {
+            AutoStartAsClient = false;
+            if (!string.IsNullOrWhiteSpace(AutoConnectIP))
+            {
+                Debug.Log($"[NetworkManagerUI] Auto-connecting to {AutoConnectIP} (from MainMenu).");
+                ConnectToDirectIP(AutoConnectIP);
+                AutoConnectIP = "";
+            }
+            else
+            {
+                Debug.Log("[NetworkManagerUI] Auto-starting LAN search (from MainMenu).");
+                StartLANSearch();
+            }
+            return;
+        }
+
+        // If no auto-start flags, hide the fallback UI since the player
+        // should be starting from MainMenu.unity. The UI only stays visible
+        // as a fallback if testing MainScene directly in the editor.
+#if !UNITY_EDITOR
+        gameObject.SetActive(false);
+#endif
+    }
+
+    /// <summary>
+    /// Extracted host logic so it can be called from both the button and auto-start.
+    /// </summary>
+    private void DoStartHost()
+    {
+        UpdateLocalName();
+
+        // Defensive: fully shut down any stale session that may be holding the port
+        if (NetworkManager.Singleton.IsListening)
+        {
+            Debug.Log("[NetworkManagerUI] Shutting down stale session before hosting.");
+            if (networkDiscovery != null) networkDiscovery.StopDiscovery();
+            NetworkManager.Singleton.Shutdown();
+        }
+
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport != null)
+        {
+            transport.SetConnectionData("127.0.0.1", (ushort)7777, "0.0.0.0");
+            Debug.Log("[NetworkManagerUI] Host transport configured to listen on 0.0.0.0:7777");
+        }
+
+        if (NetworkManager.Singleton.StartHost())
+        {
+            if (networkDiscovery != null) networkDiscovery.StartBroadcasting();
+            gameObject.SetActive(false);
+            Debug.Log("[NetworkManagerUI] Host started successfully.");
+        }
+        else
+        {
+            NetworkManager.Singleton.Shutdown();
+            if (statusText != null)
+                statusText.text = "Port 7777 in use. Close other instances or restart Unity.";
+            Debug.LogError("[NetworkManagerUI] StartHost failed — port 7777 is likely held by another process.");
         }
     }
 

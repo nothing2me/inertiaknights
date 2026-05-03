@@ -14,8 +14,6 @@ using TMPro;
 /// </summary>
 public class MainMenuRPGSetup : MonoBehaviour
 {
-    [Header("Network Manager (auto-found if blank)")]
-    [SerializeField] private NetworkManagerUI networkManagerUI;
 
     // ─── Fade-In ─────────────────────────────────────────────────────────
     [Header("── Fade-In ──")]
@@ -55,6 +53,7 @@ public class MainMenuRPGSetup : MonoBehaviour
     private const string SceneStore     = "StoreScene";
     private const string SceneCharacter = "CharacterScene";
     private const string SceneSettings  = "SettingsScene";
+    private const string SceneGame      = "MainScene";
 
     private static readonly Color IndicatorColor = new Color(1f, 0.80f, 0.20f, 1f); // gold
 
@@ -71,9 +70,6 @@ public class MainMenuRPGSetup : MonoBehaviour
 
     private void Awake()
     {
-        // Auto-find network UI
-        if (networkManagerUI == null)
-            networkManagerUI = FindAnyObjectByType<NetworkManagerUI>();
 
         // Hide panels at start
         if (joinPanel != null)    joinPanel.SetActive(false);
@@ -530,27 +526,50 @@ public class MainMenuRPGSetup : MonoBehaviour
     #region Button Callbacks
     // =====================================================================
 
-    /// <summary>HOST GAME — delegates to NetworkManagerUI.</summary>
+    /// <summary>HOST GAME — sets auto-host flag, transfers name, loads MainScene.</summary>
     public void OnHostGame()
     {
         SetStatus(string.Empty);
-        SimulateHostClick();
+        TransferPlayerName();
+        NetworkManagerUI.AutoStartAsHost  = true;
+        NetworkManagerUI.AutoStartAsClient = false;
+        NetworkManagerUI.AutoConnectIP    = "";
+        Debug.Log("[MainMenuRPG] Queueing Host → loading MainScene.");
+        SceneManager.LoadScene(SceneGame);
     }
 
-    /// <summary>JOIN GAME — toggles the IP panel.</summary>
+    /// <summary>JOIN GAME — toggles the IP panel so user can enter an address or just hit Connect for LAN.</summary>
     public void OnJoinGame()
     {
-        if (joinPanel == null) return;
+        if (joinPanel == null)
+        {
+            // No join panel — go straight to LAN search
+            TransferPlayerName();
+            NetworkManagerUI.AutoStartAsClient = true;
+            NetworkManagerUI.AutoStartAsHost   = false;
+            NetworkManagerUI.AutoConnectIP     = "";
+            Debug.Log("[MainMenuRPG] Queueing LAN Join → loading MainScene.");
+            SceneManager.LoadScene(SceneGame);
+            return;
+        }
         bool nowVisible = !joinPanel.activeSelf;
         joinPanel.SetActive(nowVisible);
         if (!nowVisible) SetStatus(string.Empty);
     }
 
-    /// <summary>Connect button inside the IP panel.</summary>
+    /// <summary>Connect button inside the IP panel — sets auto-client flag with IP, loads MainScene.</summary>
     public void OnConnectWithIP()
     {
-        SetStatus("Connecting…");
-        SimulateClientClick();
+        TransferPlayerName();
+        string ip = "";
+        if (ipInputField != null && !string.IsNullOrWhiteSpace(ipInputField.text))
+            ip = ipInputField.text.Trim();
+
+        NetworkManagerUI.AutoStartAsClient = true;
+        NetworkManagerUI.AutoStartAsHost   = false;
+        NetworkManagerUI.AutoConnectIP     = ip;
+        Debug.Log($"[MainMenuRPG] Queueing Client (IP='{ip}') → loading MainScene.");
+        SceneManager.LoadScene(SceneGame);
     }
 
     /// <summary>QUIT — closes the application.</summary>
@@ -581,24 +600,14 @@ public class MainMenuRPGSetup : MonoBehaviour
         if (statusText != null) statusText.text = msg;
     }
 
-    private void SimulateHostClick()
+    /// <summary>
+    /// Transfers the entered player name to NetworkManagerUI.LocalPlayerName
+    /// so it persists across the scene transition.
+    /// </summary>
+    private void TransferPlayerName()
     {
-        if (networkManagerUI == null) return;
-        var field = typeof(NetworkManagerUI)
-            .GetField("hostButton", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (field == null) return;
-        var btn = field.GetValue(networkManagerUI) as Button;
-        btn?.onClick.Invoke();
-    }
-
-    private void SimulateClientClick()
-    {
-        if (networkManagerUI == null) return;
-        var field = typeof(NetworkManagerUI)
-            .GetField("clientButton", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (field == null) return;
-        var btn = field.GetValue(networkManagerUI) as Button;
-        btn?.onClick.Invoke();
+        if (nameInputField != null && !string.IsNullOrWhiteSpace(nameInputField.text))
+            NetworkManagerUI.LocalPlayerName = nameInputField.text.Trim();
     }
 
     /// <summary>
