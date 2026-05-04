@@ -872,8 +872,13 @@ public class BallController : NetworkBehaviour
     [ContextMenu("Manual Respawn")]
     public void Respawn()
     {
-        // Get a fresh position from the spawn manager if available
-        if (PlayerSpawnManager.Instance != null)
+        HayPile hayPile = Object.FindFirstObjectByType<HayPile>();
+        if (hayPile != null)
+        {
+            spawnPosition = hayPile.transform.position + Vector3.up * 2f;
+            isFallingFromSky = false;
+        }
+        else if (PlayerSpawnManager.Instance != null)
         {
             spawnPosition = PlayerSpawnManager.Instance.GetRandomSpawnPosition();
         }

@@ -18,7 +18,7 @@ public class PlayerSpawnManager : MonoBehaviour
     public float spawnHeightOffset = 1f;
 
     [Header("Debug")]
-    public bool drawGizmos = true;
+    public bool drawGizmos = false;
 
     private void Awake()
     {
@@ -67,6 +67,7 @@ public class PlayerSpawnManager : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        if (Application.isPlaying) return;
         if (!drawGizmos || spawnPlatform == null) return;
 
         Gizmos.color = new Color(0, 1, 1, 0.3f);

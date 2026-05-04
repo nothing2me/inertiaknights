@@ -343,6 +343,18 @@ public class ScoreCounter : MonoBehaviour
         UpdateHUDText();
     }
 
+    public int GetScore()
+    {
+        return score;
+    }
+
+    public void DeductScore(int points)
+    {
+        score -= points;
+        if (score < 0) score = 0;
+        UpdateHUDText();
+    }
+
     public void UpdateStats(float speed, bool jumpReady, int health, int maxHealth = 3)
     {
         currentSpeed = speed;
