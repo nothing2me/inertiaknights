@@ -447,8 +447,9 @@ public class BallController : NetworkBehaviour
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }
 
-        // Check for manual respawn
-        if (respawnAction.triggered)
+        // Check for manual respawn — only allowed before a class is picked
+        // Once a class is assigned (playerClass > 0), R is used by class abilities
+        if (respawnAction.triggered && playerClass.Value == 0)
         {
             Respawn();
         }

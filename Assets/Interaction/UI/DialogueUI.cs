@@ -45,7 +45,6 @@ public class DialogueUI : MonoBehaviour
         Canvas canvas = GetComponentInParent<Canvas>();
         if (canvas != null)
         {
-            canvas.sortingOrder = 100; // Force rendering on top of game HUD
             UnityEngine.UI.CanvasScaler scaler = canvas.GetComponent<UnityEngine.UI.CanvasScaler>();
             if (scaler == null) scaler = canvas.gameObject.AddComponent<UnityEngine.UI.CanvasScaler>();
             scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -57,6 +56,14 @@ public class DialogueUI : MonoBehaviour
         // --- Auto-center the Dialogue Panel at the bottom ---
         if (panel != null)
         {
+            Canvas panelCanvas = panel.GetComponent<Canvas>();
+            if (panelCanvas == null) panelCanvas = panel.AddComponent<Canvas>();
+            panelCanvas.overrideSorting = true;
+            panelCanvas.sortingOrder = 100;
+            
+            UnityEngine.UI.GraphicRaycaster raycaster = panel.GetComponent<UnityEngine.UI.GraphicRaycaster>();
+            if (raycaster == null) panel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
             RectTransform rt = panel.GetComponent<RectTransform>();
             if (rt != null)
             {

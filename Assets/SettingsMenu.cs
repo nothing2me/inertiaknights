@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using TMPro;
+using UnityEngine.UI;
 
 public class SettingsMenu : MonoBehaviour
 {
@@ -167,8 +169,64 @@ public class SettingsMenu : MonoBehaviour
             "<b>Sprint:</b> Left Shift\n" +
             "<b>Attack:</b> Left Mouse Button / Enter\n" +
             "<b>Interact:</b> E\n" +
-            "<b>Crouch:</b> C\n" +
-            "<b>Previous Item:</b> 1\n" +
-            "<b>Next Item:</b> 2";
+            "<b>Ability 1:</b> Q   <b>Ability 2:</b> R   <b>Ability 3:</b> F\n" +
+            "<b>Pause:</b> ESC";
+
+        // --- Exit to Menu Button ---
+        GameObject btnObj = new GameObject("ExitToMenuButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(settingsPanel.transform, false);
+        RectTransform btnRt = btnObj.GetComponent<RectTransform>();
+        btnRt.anchorMin = new Vector2(0.5f, 0f);
+        btnRt.anchorMax = new Vector2(0.5f, 0f);
+        btnRt.pivot     = new Vector2(0.5f, 0f);
+        btnRt.anchoredPosition = new Vector2(0, 30f);
+        btnRt.sizeDelta = new Vector2(300f, 60f);
+
+        Image btnImg = btnObj.GetComponent<Image>();
+        btnImg.color = new Color(0.6f, 0.05f, 0.05f, 0.95f); // Dark red
+
+        Button btn = btnObj.GetComponent<Button>();
+        btn.onClick.AddListener(ExitToMenu);
+
+        // Button label
+        GameObject lblObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        lblObj.transform.SetParent(btnObj.transform, false);
+        RectTransform lblRt = lblObj.GetComponent<RectTransform>();
+        lblRt.anchorMin = Vector2.zero;
+        lblRt.anchorMax = Vector2.one;
+        lblRt.offsetMin = Vector2.zero;
+        lblRt.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI lblTmp = lblObj.GetComponent<TextMeshProUGUI>();
+        lblTmp.text = "EXIT TO MENU";
+        lblTmp.fontSize = 26;
+        lblTmp.color = Color.white;
+        lblTmp.alignment = TextAlignmentOptions.Center;
+        lblTmp.raycastTarget = false;
+
+        var lblOutline = lblObj.AddComponent<Outline>();
+        lblOutline.effectColor = Color.black;
+        lblOutline.effectDistance = new Vector2(2, -2);
+
+        Font customFont2 = Resources.Load<Font>("MedievalSharp-Bold");
+        if (customFont2 != null) lblTmp.font = TMPro.TMP_FontAsset.CreateFontAsset(customFont2);
+    }
+
+    public void ExitToMenu()
+    {
+        // Restore game state
+        Time.timeScale = 1f;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // Shut down Netcode session gracefully
+        if (Unity.Netcode.NetworkManager.Singleton != null &&
+            Unity.Netcode.NetworkManager.Singleton.IsListening)
+        {
+            Unity.Netcode.NetworkManager.Singleton.Shutdown();
+        }
+
+        // Load main menu scene
+        SceneManager.LoadScene("MainMenu");
     }
 }

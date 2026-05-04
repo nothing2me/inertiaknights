@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 public class ScoreCounter : MonoBehaviour
 {
@@ -16,6 +17,33 @@ public class ScoreCounter : MonoBehaviour
     private GameObject bossObj;
     private GameObject scoreHudObj;
     private GameObject[] abilityIcons = new GameObject[3];
+    private GameObject[] keybindLabels = new GameObject[3];
+    private int _lastAppliedClass = -1; // Track last applied class to avoid redundant swaps
+
+    // All class icon sets preloaded at startup
+    private static readonly string[][] ClassIconSets = new string[][]
+    {
+        new string[] { "k_grapple", "k_dash", "k_passive" }, // Class 1: Knight
+        new string[] { "h_beam",    "h_aoe",  "h_rev"     }, // Class 2: Healer
+        new string[] { "h_shield",  "h_slam",  "h_arm"     }, // Class 3: Heavy
+    };
+
+    // Keybind labels per class (matches ClassIconSets order)
+    private static readonly string[][] ClassKeybinds = new string[][]
+    {
+        new string[] { "Q",    "R",    "PASSIVE" }, // Knight
+        new string[] { "Q",    "R",    "F"        }, // Healer
+        new string[] { "Q",    "R",    "PASSIVE"  }, // Heavy
+    };
+
+    // Keys that trigger each ability slot (null = passive, no dim)
+    private static readonly UnityEngine.InputSystem.Key?[][] ClassAbilityKeys = new UnityEngine.InputSystem.Key?[][]
+    {
+        new UnityEngine.InputSystem.Key?[] { UnityEngine.InputSystem.Key.Q, UnityEngine.InputSystem.Key.R, null },
+        new UnityEngine.InputSystem.Key?[] { UnityEngine.InputSystem.Key.Q, UnityEngine.InputSystem.Key.R, UnityEngine.InputSystem.Key.F },
+        new UnityEngine.InputSystem.Key?[] { UnityEngine.InputSystem.Key.Q, UnityEngine.InputSystem.Key.R, null },
+    };
+    private int _currentClassIdx = 0; // 0=Knight,1=Healer,2=Heavy
     
     // Feature: Boss Defeats & Health Bar
     public static ScoreCounter Instance;
@@ -214,33 +242,34 @@ public class ScoreCounter : MonoBehaviour
                     healthBarObj.SetActive(false);
                 }
 
-                // --- Instantiate Ability Icons ---
-                string[] knightIcons = { "k_grapple", "k_dash", "k_passive" };
+                // --- Instantiate Ability Icons (default: Knight) ---
                 for (int i = 0; i < 3; i++)
                 {
-                    Texture2D tex = Resources.Load<Texture2D>(knightIcons[i]);
+                    Texture2D tex = Resources.Load<Texture2D>(ClassIconSets[0][i]);
                     if (tex != null)
                     {
-                        GameObject iconObj = new GameObject($"AbilityIcon_{i}", typeof(RectTransform), typeof(UnityEngine.UI.RawImage));
+                        GameObject iconObj = new GameObject($"AbilityIcon_{i}", typeof(RectTransform), typeof(RawImage));
                         iconObj.transform.SetParent(canvas.transform, false);
                         RectTransform iconRt = iconObj.GetComponent<RectTransform>();
                         
-                        // Anchor to Middle-Left
                         iconRt.anchorMin = new Vector2(0f, 0.5f);
                         iconRt.anchorMax = new Vector2(0f, 0.5f);
                         iconRt.pivot = new Vector2(0f, 0.5f);
                         
-                        // Precise Y coordinates to match the HUD rings exactly
-                        float[] yPositions = { 340f, 85f, -130f }; // Top, Middle, Bottom
+                        float[] yPositions = { 320f, 85f, -130f };
                         iconRt.anchoredPosition = new Vector2(40f, yPositions[i]);
                         iconRt.sizeDelta = new Vector2(120f, 120f);
                         
-                        UnityEngine.UI.RawImage img = iconObj.GetComponent<UnityEngine.UI.RawImage>();
+                        RawImage img = iconObj.GetComponent<RawImage>();
                         img.texture = tex;
                         img.raycastTarget = false;
                         
                         abilityIcons[i] = iconObj;
                         iconObj.SetActive(false);
+
+                        // Create keybind label
+                        keybindLabels[i] = CreateKeybindLabel(canvas, ClassKeybinds[0][i], yPositions[i]);
+                        keybindLabels[i].SetActive(false);
                     }
                 }
             }
@@ -295,6 +324,12 @@ public class ScoreCounter : MonoBehaviour
             if (scoreHudObj != null) scoreHudObj.transform.SetAsLastSibling();
             scoreText.transform.SetAsLastSibling();
             
+            // Keybind labels MUST render above the HUD frame
+            for (int i = 0; i < 3; i++)
+            {
+                if (keybindLabels[i] != null) keybindLabels[i].transform.SetAsLastSibling();
+            }
+            
             // Hide initially until the game actually starts
             scoreText.gameObject.SetActive(false);
         }
@@ -326,6 +361,7 @@ public class ScoreCounter : MonoBehaviour
             for (int i = 0; i < 3; i++)
             {
                 if (abilityIcons[i] != null) abilityIcons[i].SetActive(true);
+                if (keybindLabels[i] != null) keybindLabels[i].SetActive(true);
             }
         }
 
@@ -364,6 +400,36 @@ public class ScoreCounter : MonoBehaviour
         accum += Time.unscaledDeltaTime;
         frames++;
 
+        // --- Swap ability icons when local player's class changes ---
+        var localBalls = FindObjectsByType<BallController>(FindObjectsSortMode.None);
+        foreach (var ball in localBalls)
+        {
+            if (ball.IsOwner)
+            {
+                int cls = ball.playerClass.Value;
+                if (cls >= 1 && cls <= 3 && cls != _lastAppliedClass)
+                {
+                    SetClassIcons(cls);
+                    _lastAppliedClass = cls;
+                }
+                break;
+            }
+        }
+
+        // --- Dim icon on ability key press ---
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb != null && _lastAppliedClass >= 1)
+        {
+            var keys = ClassAbilityKeys[_currentClassIdx];
+            for (int i = 0; i < 3; i++)
+            {
+                if (keys[i].HasValue && kb[keys[i].Value].wasPressedThisFrame && abilityIcons[i] != null)
+                {
+                    StartCoroutine(DimIcon(abilityIcons[i].GetComponent<RawImage>()));
+                }
+            }
+        }
+
         if (timeleft <= 0.0)
         {
             currentFps = frames / accum;
@@ -373,6 +439,85 @@ public class ScoreCounter : MonoBehaviour
             
             UpdateHUDText();
         }
+    }
+
+    public void SetClassIcons(int classType)
+    {
+        // classType: 1=Knight, 2=Healer, 3=Heavy (maps to ClassIconSets index 0,1,2)
+        _currentClassIdx = Mathf.Clamp(classType - 1, 0, ClassIconSets.Length - 1);
+        string[] iconSet   = ClassIconSets[_currentClassIdx];
+        string[] keybinds  = ClassKeybinds[_currentClassIdx];
+
+        for (int i = 0; i < 3; i++)
+        {
+            // Swap icon texture
+            if (abilityIcons[i] != null)
+            {
+                Texture2D tex = Resources.Load<Texture2D>(iconSet[i]);
+                if (tex != null)
+                {
+                    var img = abilityIcons[i].GetComponent<RawImage>();
+                    if (img != null) { img.texture = tex; img.color = Color.white; }
+                }
+            }
+
+            // Swap keybind label
+            if (keybindLabels[i] != null)
+            {
+                var tmp = keybindLabels[i].GetComponent<TextMeshProUGUI>();
+                if (tmp != null) tmp.text = keybinds[i];
+            }
+        }
+    }
+
+    private GameObject CreateKeybindLabel(Canvas canvas, string key, float yPos)
+    {
+        GameObject labelObj = new GameObject("KeybindLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+        labelObj.transform.SetParent(canvas.transform, false);
+
+        RectTransform rt = labelObj.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 0.5f);
+        rt.anchorMax = new Vector2(0f, 0.5f);
+        rt.pivot     = new Vector2(0f, 0.5f);
+        // Offset to the right of the icon, shifted left slightly
+        rt.anchoredPosition = new Vector2(148f, yPos - 40f);
+        rt.sizeDelta = new Vector2(130f, 36f);
+
+        TextMeshProUGUI tmp = labelObj.GetComponent<TextMeshProUGUI>();
+        tmp.text = key;
+        tmp.fontSize = 22;
+        tmp.color = Color.white;
+        tmp.alignment = TextAlignmentOptions.Left;
+        tmp.raycastTarget = false;
+
+        // Black outline
+        var outline = labelObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0, 0, 0, 1f);
+        outline.effectDistance = new Vector2(1, -1);
+
+        // Apply custom font if available
+        Font customFont = Resources.Load<Font>("MedievalSharp-Bold");
+        if (customFont != null) tmp.font = TMP_FontAsset.CreateFontAsset(customFont);
+
+        return labelObj;
+    }
+
+    private System.Collections.IEnumerator DimIcon(RawImage img)
+    {
+        if (img == null) yield break;
+        img.color = new Color(0.3f, 0.3f, 0.3f, 1f); // Dim to dark grey
+        yield return new WaitForSeconds(0.8f); // Hold dim for 0.8s
+        // Fade back to full brightness
+        float t = 0f;
+        Color dimColor  = new Color(0.3f, 0.3f, 0.3f, 1f);
+        Color fullColor = Color.white;
+        while (t < 1f)
+        {
+            t += Time.deltaTime * 3f;
+            img.color = Color.Lerp(dimColor, fullColor, t);
+            yield return null;
+        }
+        img.color = fullColor;
     }
 
     private void UpdateHUDText()
