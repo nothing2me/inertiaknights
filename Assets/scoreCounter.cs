@@ -14,6 +14,8 @@ public class ScoreCounter : MonoBehaviour
     // New HUD Elements
     private GameObject frameObj;
     private GameObject bossObj;
+    private GameObject scoreHudObj;
+    private GameObject[] abilityIcons = new GameObject[3];
     
     // Feature: Boss Defeats & Health Bar
     public static ScoreCounter Instance;
@@ -138,6 +140,27 @@ public class ScoreCounter : MonoBehaviour
                     }
                 }
 
+                // --- Instantiate Score HUD Frame ---
+                Texture2D scoreHudTex = Resources.Load<Texture2D>("score_hud");
+                if (scoreHudTex != null)
+                {
+                    scoreHudObj = new GameObject("ScoreHUDFrame", typeof(RectTransform), typeof(UnityEngine.UI.RawImage));
+                    scoreHudObj.transform.SetParent(canvas.transform, false);
+                    RectTransform scoreRt = scoreHudObj.GetComponent<RectTransform>();
+                    scoreRt.anchorMin = new Vector2(1f, 1f); // Top Right
+                    scoreRt.anchorMax = new Vector2(1f, 1f);
+                    scoreRt.pivot = new Vector2(1f, 1f);
+                    scoreRt.anchoredPosition = new Vector2(-20, -20); // 20px padding from the corner
+                    
+                    float scaleRatio = 125f / scoreHudTex.height;
+                    scoreRt.sizeDelta = new Vector2(scoreHudTex.width * scaleRatio, scoreHudTex.height * scaleRatio);
+                    
+                    UnityEngine.UI.RawImage scoreImg = scoreHudObj.GetComponent<UnityEngine.UI.RawImage>();
+                    scoreImg.texture = scoreHudTex;
+                    scoreImg.raycastTarget = false;
+                    scoreHudObj.SetActive(false);
+                }
+
                 // --- Instantiate Health Bar ---
                 Texture2D healthBarTex = Resources.Load<Texture2D>("health_bar");
                 if (healthBarTex != null)
@@ -190,34 +213,86 @@ public class ScoreCounter : MonoBehaviour
                     
                     healthBarObj.SetActive(false);
                 }
+
+                // --- Instantiate Ability Icons ---
+                string[] knightIcons = { "k_grapple", "k_dash", "k_passive" };
+                for (int i = 0; i < 3; i++)
+                {
+                    Texture2D tex = Resources.Load<Texture2D>(knightIcons[i]);
+                    if (tex != null)
+                    {
+                        GameObject iconObj = new GameObject($"AbilityIcon_{i}", typeof(RectTransform), typeof(UnityEngine.UI.RawImage));
+                        iconObj.transform.SetParent(canvas.transform, false);
+                        RectTransform iconRt = iconObj.GetComponent<RectTransform>();
+                        
+                        // Anchor to Middle-Left
+                        iconRt.anchorMin = new Vector2(0f, 0.5f);
+                        iconRt.anchorMax = new Vector2(0f, 0.5f);
+                        iconRt.pivot = new Vector2(0f, 0.5f);
+                        
+                        // Precise Y coordinates to match the HUD rings exactly
+                        float[] yPositions = { 340f, 85f, -130f }; // Top, Middle, Bottom
+                        iconRt.anchoredPosition = new Vector2(40f, yPositions[i]);
+                        iconRt.sizeDelta = new Vector2(120f, 120f);
+                        
+                        UnityEngine.UI.RawImage img = iconObj.GetComponent<UnityEngine.UI.RawImage>();
+                        img.texture = tex;
+                        img.raycastTarget = false;
+                        
+                        abilityIcons[i] = iconObj;
+                        iconObj.SetActive(false);
+                    }
+                }
             }
 
-            // Reposition scoreText to Top-Left nicely
+            // Reposition scoreText to Top-Right nicely inside the new score HUD frame
             RectTransform rt = scoreText.GetComponent<RectTransform>();
             if (rt != null)
             {
-                rt.anchorMin = new Vector2(0f, 1f);
-                rt.anchorMax = new Vector2(0f, 1f);
-                rt.pivot = new Vector2(0f, 1f);
-                // Move it even further down so FPS isn't cut off at the top
-                rt.anchoredPosition = new Vector2(250, -150);
-                rt.sizeDelta = new Vector2(800, 600); 
+                rt.anchorMin = new Vector2(1f, 1f);
+                rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot = new Vector2(1f, 1f);
+                rt.anchoredPosition = new Vector2(-20, -20); // Match frame position
+                rt.sizeDelta = new Vector2(412.5f, 125f); // Match frame size exactly
                 rt.localScale = Vector3.one;          
                 rt.localRotation = Quaternion.identity;
             }
             
-            // CRITICAL: Disable Auto-Sizing so the text doesn't balloon up to fill the 800x600 box
+            // CRITICAL: Disable Auto-Sizing so the text doesn't balloon up
             scoreText.enableAutoSizing = false;
-            scoreText.fontSize = 24;
-            scoreText.alignment = TextAlignmentOptions.TopLeft;
+            scoreText.fontSize = 50; // Increased size slightly since it's just a number
+            scoreText.alignment = TextAlignmentOptions.Center; // Centered inside the frame
             scoreText.overflowMode = TextOverflowModes.Overflow; 
             scoreText.margin = Vector4.zero; 
             scoreText.raycastTarget = false; 
             
+            // Format text: Yellow with Black Stroke
+            scoreText.color = Color.yellow;
+            var outline = scoreText.gameObject.GetComponent<UnityEngine.UI.Outline>();
+            if (outline == null) outline = scoreText.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = new Color(0, 0, 0, 1f);
+            outline.effectDistance = new Vector2(2, -2);
+            
+            // Apply Custom Font
+            Font customFont = Resources.Load<Font>("MedievalSharp-Bold");
+            if (customFont != null)
+            {
+                TMPro.TMP_FontAsset tmpFont = TMPro.TMP_FontAsset.CreateFontAsset(customFont);
+                scoreText.font = tmpFont;
+            }
+            
             // Strictly enforce rendering Z-index (First sibling renders in back, last in front)
             if (healthBarObj != null) healthBarObj.transform.SetAsFirstSibling();
-            if (frameObj != null) frameObj.transform.SetSiblingIndex(1);
-            if (bossObj != null) bossObj.transform.SetSiblingIndex(2);
+            
+            // Render ability icons right after healthbar (behind the main frame!)
+            for (int i = 0; i < 3; i++)
+            {
+                if (abilityIcons[i] != null) abilityIcons[i].transform.SetAsLastSibling();
+            }
+            
+            if (frameObj != null) frameObj.transform.SetAsLastSibling();
+            if (bossObj != null) bossObj.transform.SetAsLastSibling();
+            if (scoreHudObj != null) scoreHudObj.transform.SetAsLastSibling();
             scoreText.transform.SetAsLastSibling();
             
             // Hide initially until the game actually starts
@@ -246,6 +321,12 @@ public class ScoreCounter : MonoBehaviour
             if (frameObj != null) frameObj.SetActive(true);
             if (bossObj != null) bossObj.SetActive(true);
             if (healthBarObj != null) healthBarObj.SetActive(true);
+            if (scoreHudObj != null) scoreHudObj.SetActive(true);
+            
+            for (int i = 0; i < 3; i++)
+            {
+                if (abilityIcons[i] != null) abilityIcons[i].SetActive(true);
+            }
         }
 
         if (healthBarRt != null && maxHealth > 0)
@@ -298,25 +379,7 @@ public class ScoreCounter : MonoBehaviour
     {
         if (scoreText != null)
         {
-            string jumpColor = canJump ? "green" : "red";
-            string jumpStatus = canJump ? "READY" : "WAIT";
-            
-            string hearts = "";
-            for (int i = 0; i < currentHealth; i++) hearts += "♥";
-            if (currentHealth <= 0) hearts = "DEAD";
-            
-            // Format FPS Color
-            string fpsColor = "green";
-            if (currentFps < 30) fpsColor = "red";
-            else if (currentFps < 60) fpsColor = "yellow";
-
-            scoreText.text = $"FPS: <color={fpsColor}>{Mathf.RoundToInt(currentFps)}</color>\n" +
-                             $"Score: {score}\n" +
-                             $"Health: <color=red>{hearts}</color>\n" +
-                             $"Speed: {currentSpeed:F2}\n" +
-                             $"Jump: <color={jumpColor}>{jumpStatus}</color>" +
-                             (string.IsNullOrEmpty(localIpAddress) ? "" : $"\nLocal IP: <color=yellow>{localIpAddress}</color>") +
-                             (string.IsNullOrEmpty(publicIpAddress) ? "" : $"\nPublic IP: <color=cyan>{publicIpAddress}</color>");
+            scoreText.text = score.ToString();
         }
     }
 }
