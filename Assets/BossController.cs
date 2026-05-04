@@ -892,6 +892,7 @@ public class BossController : NetworkBehaviour
         isDead = true;
         
         Debug.Log($"[Boss] {bossName} has been defeated!");
+        NotifyDeathClientRpc();
         onDeath?.Invoke();
 
         if (GameProgressionManager.Instance != null)
@@ -904,6 +905,15 @@ public class BossController : NetworkBehaviour
 
         if (IsSpawned) GetComponent<NetworkObject>().Despawn();
         else Destroy(gameObject);
+    }
+
+    [ClientRpc]
+    private void NotifyDeathClientRpc()
+    {
+        if (ScoreCounter.Instance != null)
+        {
+            ScoreCounter.Instance.MarkBossDefeated();
+        }
     }
 
     // ─── UI ───────────────────────────────────────────────────────
