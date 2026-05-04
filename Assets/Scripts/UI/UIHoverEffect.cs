@@ -29,6 +29,11 @@ public class UIHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     public void OnPointerEnter(PointerEventData eventData)
     {
         targetScale = originalScale * hoverScale;
+        
+        if (MusicManager.Instance != null)
+        {
+            MusicManager.Instance.PlayUIHover();
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)

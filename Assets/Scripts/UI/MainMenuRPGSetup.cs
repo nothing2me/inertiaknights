@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using TMPro;
 
@@ -70,6 +71,12 @@ public class MainMenuRPGSetup : MonoBehaviour
 
     private void Awake()
     {
+        // ── Spawn MusicManager if it doesn't exist ───────────────────────
+        if (MusicManager.Instance == null)
+        {
+            GameObject musicMgr = new GameObject("MusicManager");
+            musicMgr.AddComponent<MusicManager>();
+        }
 
         // Hide panels at start
         if (joinPanel != null)    joinPanel.SetActive(false);
@@ -98,6 +105,31 @@ public class MainMenuRPGSetup : MonoBehaviour
 
         // ── Ensure decorative elements don't block input ────────────────
         FixRaycasts();
+
+        // ── Add Hover Sounds to all Buttons ─────────────────────────────
+        AddHoverSoundsToAllButtons();
+    }
+
+    /// <summary>
+    /// Dynamically adds a hover sound to every button in the Main Menu
+    /// so we don't have to manually configure each one.
+    /// </summary>
+    private void AddHoverSoundsToAllButtons()
+    {
+        foreach (var btn in GetComponentsInChildren<Button>(true))
+        {
+            var trigger = btn.gameObject.GetComponent<EventTrigger>();
+            if (trigger == null) trigger = btn.gameObject.AddComponent<EventTrigger>();
+
+            var entry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+            entry.callback.AddListener((data) => {
+                if (MusicManager.Instance != null && btn.interactable)
+                {
+                    MusicManager.Instance.PlayUIHover();
+                }
+            });
+            trigger.triggers.Add(entry);
+        }
     }
 
     /// <summary>
