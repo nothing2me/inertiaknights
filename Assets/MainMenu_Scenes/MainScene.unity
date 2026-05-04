@@ -6131,10 +6131,8 @@ MonoBehaviour:
   - Oh my!
   - Good thing I put this hay here.
   - Did you come from the tower? You must've!
-  - The tower has gone nuts! I had to leave my shops and family up there...
-  - Oh my sweet baby Ballor!
-  - ....
-  - You must ascend the great Tower and find the cause of its downfall!
+  - The Tower has been cursed! and the town... Almost all of its people are gone!
+  - Please! Oh Great Hero! Ascend the Tower and find the cause of this calamity!
 --- !u!64 &276901655
 MeshCollider:
   m_ObjectHideFlags: 0
