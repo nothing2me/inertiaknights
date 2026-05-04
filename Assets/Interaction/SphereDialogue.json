@@ -1,0 +1,56 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "speakerName": "The Great Sphere",
+      "text": "Greetings, rolling pioneer. I have balanced atop this spire for eons. What brings a sphere of your... diameter to these heights?",
+      "choices": [
+        {
+          "text": "I seek the summit and the Final Boss.",
+          "nextNodeId": "summit"
+        },
+        {
+          "text": "I'm just admiring the view.",
+          "nextNodeId": "view"
+        },
+        {
+          "text": "Who are you exactly?",
+          "nextNodeId": "who"
+        }
+      ]
+    },
+    {
+      "id": "summit",
+      "speakerName": "The Great Sphere",
+      "text": "The summit? A treacherous path. Many have rolled high, only to fall further. Proceed with caution.",
+      "choices": []
+    },
+    {
+      "id": "view",
+      "speakerName": "The Great Sphere",
+      "text": "The view is indeed grand. From here, you can see the curvature of the world... if you look closely enough.",
+      "choices": []
+    },
+    {
+      "id": "who",
+      "speakerName": "The Great Sphere",
+      "text": "I am the Witness of the Roll. I have seen every climb and every plummet. I am... perfectly balanced.",
+      "choices": [
+        {
+          "text": "That's deeply impressive.",
+          "nextNodeId": "start"
+        },
+        {
+          "text": "Sounds lonely.",
+          "nextNodeId": "lonely"
+        }
+      ]
+    },
+    {
+      "id": "lonely",
+      "speakerName": "The Great Sphere",
+      "text": "Loneliness is for those who cannot keep themselves centered. I require only gravity and my own surface tension.",
+      "choices": []
+    }
+  ]
+}
