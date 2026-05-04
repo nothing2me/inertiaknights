@@ -9,16 +9,28 @@ using UnityEngine;
 /// </summary>
 public class InteractPromptHUD : MonoBehaviour
 {
-    public static InteractPromptHUD Instance { get; private set; }
+    public static InteractPromptHUD Instance 
+    { 
+        get 
+        {
+            if (_instance == null) _instance = Object.FindFirstObjectByType<InteractPromptHUD>();
+            return _instance;
+        }
+    }
+    private static InteractPromptHUD _instance;
 
     [SerializeField] private GameObject panel;
     [SerializeField] private TextMeshProUGUI label;
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
+        if (_instance != null && _instance != this) { Destroy(gameObject); return; }
+        _instance = this;
+        
+        if (transform.parent == null)
+            DontDestroyOnLoad(gameObject);
+        else
+            Debug.LogWarning($"[InteractPromptHUD] {name} is not a root object! DontDestroyOnLoad skipped. Move it to the root of the hierarchy.");
 
         // --- Auto-configure Canvas Scaling ---
         Canvas canvas = GetComponentInParent<Canvas>();

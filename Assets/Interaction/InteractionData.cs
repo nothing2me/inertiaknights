@@ -37,6 +37,9 @@ public class InteractionData : ScriptableObject
     [Tooltip("Disables this interactable after first use.")]
     public bool oneShot = false;
 
+    [Header("Shop Settings")]
+    public string storeSceneName = "StoreScene";
+
     [Header("Content — Dialogue (quick, no CutsceneData needed)")]
     public DialogueLine[] dialogueLines;
 

@@ -13,12 +13,6 @@ using UnityEngine;
 [RequireComponent(typeof(MeshRenderer))]
 public class BillboardSpriteAnimator : MonoBehaviour
 {
-    public enum BillboardMode { Player, Enemy, Boss }
-
-    [Header("Mode")]
-    [Tooltip("Players switch sprites based on class. Enemies/Bosses strictly use the assigned Spritesheet.")]
-    public BillboardMode mode = BillboardMode.Player;
-
     // ── Spritesheet ──────────────────────────────────────────────
     [Header("Spritesheet")]
     public Texture2D spritesheet;
@@ -130,20 +124,6 @@ public class BillboardSpriteAnimator : MonoBehaviour
     // Unity lifecycle
     // ─────────────────────────────────────────────────────────────
 
-#if UNITY_EDITOR
-    void OnValidate()
-    {
-        // Instantly preview scale and offset changes in the Prefab Editor!
-        transform.localScale = new Vector3(spriteWidth, spriteHeight, 1f);
-        
-        // If not playing, position it relative to its parent so you can preview the pivot offset
-        if (!Application.isPlaying)
-        {
-            transform.localPosition = pivotOffset;
-        }
-    }
-#endif
-
     void Awake()
     {
         // Build a dedicated material so we don't mutate any shared asset
@@ -187,16 +167,7 @@ public class BillboardSpriteAnimator : MonoBehaviour
     {
         // Stick to the ball every frame without inheriting its rotation
         if (followTarget != null)
-        {
             transform.position = followTarget.position + pivotOffset;
-        }
-        else
-        {
-            // The target we were following was destroyed (e.g., enemy/boss died).
-            // Since we unparented ourselves in Start(), we must manually clean ourselves up!
-            Destroy(gameObject);
-            return;
-        }
 
         RefreshCamera();
         UpdateState();
@@ -255,7 +226,7 @@ public class BillboardSpriteAnimator : MonoBehaviour
     void UpdateState()
     {
         // --- Networked Class Sprite Routing ---
-        if (mode == BillboardMode.Player && ballController != null)
+        if (ballController != null)
         {
             int netClass = ballController.playerClass.Value;
             if (netClass != currentClassIndex)

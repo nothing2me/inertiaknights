@@ -484,10 +484,7 @@ public class BossController : NetworkBehaviour
         }
 
         if (enableCircling && Random.value < orbitTendency)
-        {
             state = BossState.Circle;
-            if (enableVortex) ShowActionTextClientRpc("VORTEX!");
-        }
         else if (dist > preferredDistance && Random.value < aggression)
             state = BossState.Approach;
         else if (dist < preferredDistance * 0.5f && Random.value > aggression)
@@ -535,7 +532,6 @@ public class BossController : NetworkBehaviour
 
     private void BeginCharge()
     {
-        ShowActionTextClientRpc("CHARGE!");
         state = BossState.WindingUp;
         windupTimer = chargeWindup;
 
@@ -583,7 +579,6 @@ public class BossController : NetworkBehaviour
 
     private void BeginSlam()
     {
-        ShowActionTextClientRpc("SLAM!");
         state = BossState.SlamJump;
         lastSlamTime = Time.time;
         rb.linearVelocity = new Vector3(rb.linearVelocity.x * 0.3f, 0f, rb.linearVelocity.z * 0.3f);
@@ -695,7 +690,6 @@ public class BossController : NetworkBehaviour
     private void BeginTether()
     {
         if (playerController == null) return;
-        ShowActionTextClientRpc("TETHER!");
         state = BossState.Tethering;
         lastTetherTime = Time.time;
         tetheredPlayer = playerController;
@@ -738,7 +732,6 @@ public class BossController : NetworkBehaviour
 
     private void BeginLeap()
     {
-        ShowActionTextClientRpc("LEAP!");
         state = BossState.LeapAscend;
         lastLeapTime = Time.time;
 
@@ -899,7 +892,6 @@ public class BossController : NetworkBehaviour
         isDead = true;
         
         Debug.Log($"[Boss] {bossName} has been defeated!");
-        NotifyDeathClientRpc();
         onDeath?.Invoke();
 
         if (GameProgressionManager.Instance != null)
@@ -912,15 +904,6 @@ public class BossController : NetworkBehaviour
 
         if (IsSpawned) GetComponent<NetworkObject>().Despawn();
         else Destroy(gameObject);
-    }
-
-    [ClientRpc]
-    private void NotifyDeathClientRpc()
-    {
-        if (ScoreCounter.Instance != null)
-        {
-            ScoreCounter.Instance.MarkBossDefeated();
-        }
     }
 
     // ─── UI ───────────────────────────────────────────────────────
@@ -971,60 +954,6 @@ public class BossController : NetworkBehaviour
     {
         if (uiContainer != null && uiContainer.activeSelf != visible)
             uiContainer.SetActive(visible);
-    }
-
-    [ClientRpc]
-    private void ShowActionTextClientRpc(string actionText)
-    {
-        if (uiContainer == null || nameText == null || !uiContainer.activeSelf) return;
-
-        GameObject textObj = new GameObject("ActionText_" + actionText, typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObj.transform.SetParent(uiContainer.transform, false);
-
-        RectTransform rt = textObj.GetComponent<RectTransform>();
-        rt.anchoredPosition3D = new Vector3(0, 0.8f, 0); // Offset slightly above name tag
-        rt.localScale = Vector3.one * 0.05f; // Match UI scale
-        rt.localRotation = Quaternion.identity;
-
-        TextMeshProUGUI tmp = textObj.GetComponent<TextMeshProUGUI>();
-        tmp.text = actionText;
-        tmp.font = nameText.font;
-        tmp.fontSize = 28;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.red; 
-        tmp.outlineWidth = 0.2f;
-        tmp.outlineColor = new Color32(0, 0, 0, 255);
-
-        StartCoroutine(AnimateActionText(tmp, rt));
-    }
-
-    private System.Collections.IEnumerator AnimateActionText(TextMeshProUGUI tmp, RectTransform rt)
-    {
-        float duration = 1.5f;
-        float time = 0f;
-        Vector3 startPos = rt.anchoredPosition3D;
-        Vector3 endPos = startPos + new Vector3(0, 1.5f, 0); // Drift upwards
-
-        while (time < duration)
-        {
-            if (tmp == null || rt == null) yield break;
-            time += Time.deltaTime;
-            float t = time / duration;
-            
-            rt.anchoredPosition3D = Vector3.Lerp(startPos, endPos, t);
-            
-            // Fade out during the second half
-            if (t > 0.5f)
-            {
-                float alpha = 1f - ((t - 0.5f) * 2f);
-                tmp.color = new Color(tmp.color.r, tmp.color.g, tmp.color.b, alpha);
-                tmp.outlineColor = new Color32(0, 0, 0, (byte)(alpha * 255));
-            }
-            yield return null;
-        }
-
-        if (tmp != null) Destroy(tmp.gameObject);
     }
 
     public void SetTargeted(bool targeted) { }

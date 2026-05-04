@@ -39,7 +39,10 @@ public class DialogueUI : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+        if (transform.parent == null)
+            DontDestroyOnLoad(gameObject);
+        else
+            Debug.LogWarning($"[DialogueUI] {name} is not a root object! DontDestroyOnLoad skipped.");
 
         // --- Auto-configure Canvas Scaling ---
         Canvas canvas = GetComponentInParent<Canvas>();
@@ -56,14 +59,6 @@ public class DialogueUI : MonoBehaviour
         // --- Auto-center the Dialogue Panel at the bottom ---
         if (panel != null)
         {
-            Canvas panelCanvas = panel.GetComponent<Canvas>();
-            if (panelCanvas == null) panelCanvas = panel.AddComponent<Canvas>();
-            panelCanvas.overrideSorting = true;
-            panelCanvas.sortingOrder = 100;
-            
-            UnityEngine.UI.GraphicRaycaster raycaster = panel.GetComponent<UnityEngine.UI.GraphicRaycaster>();
-            if (raycaster == null) panel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-
             RectTransform rt = panel.GetComponent<RectTransform>();
             if (rt != null)
             {
@@ -75,33 +70,14 @@ public class DialogueUI : MonoBehaviour
                 rt.sizeDelta = new Vector2(1000, 300); 
             }
 
-            // --- Scroll Frame Background ---
+            // --- Rounded Corners and Stroke ---
             Image panelImage = panel.GetComponent<Image>();
             if (panelImage != null)
             {
-                Sprite scrollSprite = Resources.Load<Sprite>("scroll_frame");
-                if (scrollSprite == null)
-                {
-                    Texture2D tex = Resources.Load<Texture2D>("scroll_frame");
-                    if (tex != null)
-                    {
-                        scrollSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-                    }
-                }
-                
-                if (scrollSprite != null)
-                {
-                    panelImage.sprite = scrollSprite;
-                    panelImage.type = Image.Type.Simple; // Prevent weird border slicing if not set up
-                    panelImage.color = Color.white;
-                }
-            }
-            
-            if (panel.GetComponent<UnityEngine.UI.Shadow>() == null)
-            {
-                var shadow = panel.AddComponent<UnityEngine.UI.Shadow>();
-                shadow.effectColor = new Color(0, 0, 0, 0.5f);
-                shadow.effectDistance = new Vector2(5, -5);
+                panelImage.type = Image.Type.Sliced;
+                // Generate a 128x128 rounded rect with 32px radius and 4px stroke
+                panelImage.sprite = CreateRoundedStrokeSprite(128, 128, 32, 4, new Color(0.1f, 0.1f, 0.1f, 0.95f), Color.white);
+                panelImage.color = Color.white; // Set to white so we see our exact generated colors
             }
         }
 
@@ -112,10 +88,10 @@ public class DialogueUI : MonoBehaviour
             if (promptRt != null)
             {
                 promptRt.SetParent(panel.transform, false);
-                promptRt.anchorMin = new Vector2(0.5f, 0f); // Bottom center
-                promptRt.anchorMax = new Vector2(0.5f, 0f);
-                promptRt.pivot = new Vector2(0.5f, 0f);
-                promptRt.anchoredPosition = new Vector2(0, 45); // Pad from the bottom center
+                promptRt.anchorMin = new Vector2(1f, 0f); // Bottom right
+                promptRt.anchorMax = new Vector2(1f, 0f);
+                promptRt.pivot = new Vector2(1f, 0f);
+                promptRt.anchoredPosition = new Vector2(-30, 20); // Pad from the bottom right corner
             }
             
             // Make the prompt text larger as requested
@@ -124,54 +100,13 @@ public class DialogueUI : MonoBehaviour
             {
                 // Force a larger sizeDelta so the text has room to be big
                 RectTransform promptRT = promptTMP.GetComponent<RectTransform>();
-                if (promptRT != null) promptRT.sizeDelta = new Vector2(800, 100);
+                if (promptRT != null) promptRT.sizeDelta = new Vector2(400, 100);
 
                 promptTMP.enableAutoSizing = false; // Stop it from shrinking to fit a tiny prefab box
-                promptTMP.fontSize = 72;            // Doubled size
+                promptTMP.fontSize = 36;            // Even larger now
                 promptTMP.color = Color.yellow; 
-                promptTMP.alignment = TextAlignmentOptions.Center;
-                
-                var outline = promptTMP.gameObject.GetComponent<UnityEngine.UI.Outline>();
-                if (outline == null) outline = promptTMP.gameObject.AddComponent<UnityEngine.UI.Outline>();
-                outline.effectColor = new Color(0, 0, 0, 1f);
-                outline.effectDistance = new Vector2(2, -2);
             }
         }
-
-        // --- Apply Custom Font ---
-        Font customFont = Resources.Load<Font>("MedievalSharp-Bold");
-        if (customFont != null)
-        {
-            TMPro.TMP_FontAsset tmpFont = TMPro.TMP_FontAsset.CreateFontAsset(customFont);
-            if (speakerNameText != null) speakerNameText.font = tmpFont;
-            if (bodyText != null) bodyText.font = tmpFont;
-            
-            if (continuePrompt != null)
-            {
-                TextMeshProUGUI promptTMP = continuePrompt.GetComponentInChildren<TextMeshProUGUI>();
-                if (promptTMP != null) promptTMP.font = tmpFont;
-            }
-        }
-
-        if (speakerNameText != null)
-        {
-            var outline = speakerNameText.gameObject.GetComponent<UnityEngine.UI.Outline>();
-            if (outline == null) outline = speakerNameText.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(0, 0, 0, 1f);
-            outline.effectDistance = new Vector2(2, -2);
-        }
-        if (bodyText != null)
-        {
-            var outline = bodyText.gameObject.GetComponent<UnityEngine.UI.Outline>();
-            if (outline == null) outline = bodyText.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(0, 0, 0, 1f);
-            outline.effectDistance = new Vector2(2, -2);
-        }
-
-        // Temporarily activate to force TMP initialization, avoiding scrambled font bug
-        panel?.SetActive(true);
-        if (speakerNameText != null) speakerNameText.ForceMeshUpdate(true, true);
-        if (bodyText != null) bodyText.ForceMeshUpdate(true, true);
 
         panel?.SetActive(false);
     }

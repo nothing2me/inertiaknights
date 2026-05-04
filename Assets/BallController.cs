@@ -168,15 +168,7 @@ public class BallController : NetworkBehaviour
 
         if (isLocalHumanPlayer)
         {
-            ScoreCounter[] counters = Object.FindObjectsByType<ScoreCounter>(FindObjectsSortMode.None);
-            foreach (var c in counters)
-            {
-                if (c.scoreText != null)
-                {
-                    scoreCounter = c;
-                    break;
-                }
-            }
+            scoreCounter = Object.FindFirstObjectByType<ScoreCounter>();
             
             // In a robust setup, the camera is a child of the prefab.
             // Let's find it specifically in our hierarchy while it's still a child.
@@ -438,7 +430,7 @@ public class BallController : NetworkBehaviour
         // Update HUD stats
         if (scoreCounter != null)
         {
-            scoreCounter.UpdateStats(rb.linearVelocity.magnitude, isGrounded, currentHealth.Value, maxHealth);
+            scoreCounter.UpdateStats(rb.linearVelocity.magnitude, isGrounded, currentHealth.Value);
         }
 
         // Check for jump input (only if grounded)
@@ -447,9 +439,8 @@ public class BallController : NetworkBehaviour
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }
 
-        // Check for manual respawn — only allowed before a class is picked
-        // Once a class is assigned (playerClass > 0), R is used by class abilities
-        if (respawnAction.triggered && playerClass.Value == 0)
+        // Check for manual respawn
+        if (respawnAction.triggered)
         {
             Respawn();
         }
