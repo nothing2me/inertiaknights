@@ -103,7 +103,15 @@ public class InteractableController : MonoBehaviour
                 break;
 
             case InteractionType.Shop:
-                Debug.Log("[InteractableController] Shop type — not yet implemented.");
+                if (_localPlayer != null) _localPlayer.movementLocked = true;
+                if (!string.IsNullOrEmpty(data.storeSceneName))
+                {
+                    UnityEngine.SceneManagement.SceneManager.LoadScene(data.storeSceneName, UnityEngine.SceneManagement.LoadSceneMode.Additive);
+                }
+                else
+                {
+                    Debug.LogWarning("[InteractableController] No storeSceneName specified in InteractionData!");
+                }
                 break;
 
             case InteractionType.DialogueTree:

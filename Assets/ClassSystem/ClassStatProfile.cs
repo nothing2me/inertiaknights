@@ -29,7 +29,7 @@ public struct ClassStatProfile
         jumpForce         = 6f,
         dashForce         = 25f,
         dashCooldown      = 0.7f,
-        maxHealth         = 2,
+        maxHealth         = 4,
         damageMultiplier  = 2.5f,
         critChance        = 0.20f,
         critDamagePercent = 0.15f,
